@@ -210,6 +210,25 @@ thead th.sortable:hover{color:var(--text-primary);}
 .kpi .value{font-size:24px; font-weight:600; margin:0; font-variant-numeric:tabular-nums;}
 .kpi .delta{font-size:12px; margin:4px 0 0; display:flex; align-items:center; gap:3px; font-variant-numeric:tabular-nums;}
 .delta.up{color:var(--good);} .delta.down{color:var(--crit);} .delta.flat{color:var(--text-muted);}
+.quad-grid{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1.25rem;}
+@media (max-width:720px){ .quad-grid{grid-template-columns:1fr;} }
+.quad-card{background:var(--surface-1); border-radius:var(--radius); padding:1rem;}
+.quad-card-head{display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin-bottom:2px;}
+.quad-card-title{font-size:13px; font-weight:600;}
+.quad-card-count{font-size:22px; font-weight:700; font-variant-numeric:tabular-nums;}
+.quad-card-sub{font-size:11.5px; color:var(--text-secondary); margin:0 0 10px;}
+.quad-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; max-height:190px; overflow-y:auto;}
+.quad-list li{display:flex; justify-content:space-between; gap:10px; font-size:12.5px; padding:4px 0; border-bottom:1px solid var(--border);}
+.quad-list li:last-child{border-bottom:none;}
+.quad-list .qn{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.quad-list .qv{flex-shrink:0; color:var(--text-secondary); font-variant-numeric:tabular-nums;}
+.quad-empty{font-size:12.5px; color:var(--text-muted); padding:6px 0;}
+.quad-good{background:var(--good-bg); color:var(--good-ink);}
+.quad-accent{background:var(--accent-bg); color:var(--accent-ink);}
+.quad-warn{background:var(--warn-bg); color:var(--warn-ink);}
+.quad-neutral{background:var(--surface-2); color:var(--text-secondary);}
+.quad-good .quad-card-sub, .quad-accent .quad-card-sub, .quad-warn .quad-card-sub{opacity:.85;}
+.quad-good .quad-list li, .quad-accent .quad-list li, .quad-warn .quad-list li{border-bottom-color:rgba(127,127,127,.25);}
 .section-title{font-size:16px; font-weight:600; margin:1.5rem 0 .6rem;}
 .controls-row{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:.75rem;}
 .seg{display:flex; background:var(--surface-1); border-radius:6px; padding:3px; gap:2px;}
@@ -475,6 +494,10 @@ tbody tr:last-child td{border-bottom:none;}
   </div>
 
   <div class="kpirow" id="kpirow"></div>
+
+  <div class="section-title">Views x Conversão</div>
+  <p class="footnote" style="margin-top:-6px;">Cruza visualizações da página do produto (GA4) com taxa de conversão (unidades vendidas ÷ views) no período selecionado. "Muitas/poucas views" e "alta/baixa conversão" são definidos pela média entre os produtos vendidos no período — não um valor fixo.</p>
+  <div class="quad-grid" id="quad-grid"></div>
 
   <div class="section-title">Ranking por receita</div>
   <div class="controls-row">
@@ -1272,6 +1295,15 @@ function attachSort(tableId, rerenderFn){
 /* ---------------- TAB 1: CURVA ABC ---------------- */
 
 const salesRows = DATA.sales_rows;
+const pageviewsRows = DATA.pageviews_rows || [];
+function viewsByRefForRange(start, end){
+  const m = new Map();
+  for(const [ref, dt, views] of pageviewsRows){
+    if(dt < start || dt > end) continue;
+    m.set(ref, (m.get(ref)||0) + views);
+  }
+  return m;
+}
 const salesNames = DATA.sales_names;
 const allDates = salesRows.map(r=>r[1]).sort();
 const minDate = allDates[0], maxDate = allDates[allDates.length-1];
@@ -1567,16 +1599,19 @@ function renderTable(tableId, entries, metricKey){
     ${th(tableId,'value',metricLabel,'number','num')}
     ${th(tableId,'cumPct','% acum.','number','num')}
     ${th(tableId,'siteShare','% do site','number','num')}
+    ${th(tableId,'views','Views','number','num')}
+    ${th(tableId,'conversion','Conversão','number','num')}
     ${th(tableId,'trend','Tendência<span class="infotip" tabindex="0" role="img" aria-label="Compara o valor deste produto no período selecionado com o período anterior de mesma duração. Setas indicam alta ou queda de mais de 0,5%; novo significa que o produto não teve vendas no período anterior.">i<span class="tooltip-box">Compara o valor deste produto no período selecionado com o período anterior de mesma duração (ex: últimos 30 dias vs. os 30 dias antes disso). Setas indicam alta ou queda de mais de 0,5%; <b>novo</b> significa que o produto não teve vendas no período anterior.</span></span>','number','num')}
   </tr>`;
   const tbody = table.querySelector('tbody');
   if(entries.length===0){
-    tbody.innerHTML = `<tr><td colspan="7"><div class="emptystate">Nenhum produto encontrado.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="emptystate">Nenhum produto encontrado.</div></td></tr>`;
     return;
   }
   const rows = applySort(entries, sortState[tableId], {
     rank: e=>e.rank, classe: e=>e.classe, name: e=>e.name, value: e=>e.value,
     cumPct: e=>e.cumPct, siteShare: e=>e.siteShare,
+    views: e=>e.views||0, conversion: e=> e.conversion==null ? -Infinity : e.conversion,
     trend: e=> e.trend===null ? -Infinity : (e.trend===Infinity ? Infinity : e.trend)
   });
   tbody.innerHTML = rows.map(e=>{
@@ -1593,6 +1628,8 @@ function renderTable(tableId, entries, metricKey){
       <td class="num">${metricStr}</td>
       <td class="num">${fmtPctPlain(e.cumPct)}</td>
       <td class="num">${fmtPctPlain(e.siteShare)}</td>
+      <td class="num">${e.views ? fmtInt.format(e.views) : '—'}</td>
+      <td class="num">${e.conversion==null ? '—' : fmtPctPlain(e.conversion)}</td>
       <td class="num ${trendCls}">${trendStr}</td>
     </tr>`;
   }).join('');
@@ -1677,12 +1714,66 @@ function renderChart(canvasId, chartVarSetter, chartVar, legendId, sparkId, char
   chartVarSetter(newChart);
 }
 
+const QUAD_DEFS = [
+  {key:'estrela', cls:'quad-good', title:'⭐ Estrelas', sub:'Muitas views + alta conversão', matches:(mv,ac)=>mv&&ac},
+  {key:'oportunidade', cls:'quad-accent', title:'💎 Oportunidade de tráfego', sub:'Poucas views + alta conversão — converte bem, precisa de mais exposição', matches:(mv,ac)=>!mv&&ac},
+  {key:'atencao', cls:'quad-warn', title:'⚠️ Tráfego não converte', sub:'Muitas views + baixa conversão — revisar página/preço/oferta', matches:(mv,ac)=>mv&&!ac},
+  {key:'baixaPrioridade', cls:'quad-neutral', title:'Baixa prioridade', sub:'Poucas views + baixa conversão', matches:(mv,ac)=>!mv&&!ac},
+];
+
+function renderViewsQuadrants(entries){
+  const withViews = entries.filter(e=>e.views>0);
+  const grid = document.getElementById('quad-grid');
+  if(withViews.length===0){
+    grid.innerHTML = '<div class="emptystate">Sem dados de visualização de página para os produtos vendidos neste período.</div>';
+    return;
+  }
+  const avgViews = withViews.reduce((s,e)=>s+e.views,0) / withViews.length;
+  const avgConv = withViews.reduce((s,e)=>s+e.conversion,0) / withViews.length;
+
+  const buckets = {estrela:[], oportunidade:[], atencao:[], baixaPrioridade:[]};
+  withViews.forEach(e=>{
+    const muitasViews = e.views >= avgViews;
+    const altaConv = e.conversion >= avgConv;
+    const def = QUAD_DEFS.find(d=>d.matches(muitasViews, altaConv));
+    buckets[def.key].push(e);
+  });
+  Object.values(buckets).forEach(list=>list.sort((a,b)=>b.views-a.views));
+
+  grid.innerHTML = QUAD_DEFS.map(def=>{
+    const list = buckets[def.key];
+    const items = list.slice(0,8).map(e=>
+      `<li><span class="qn">${e.name}</span><span class="qv">${fmtInt.format(e.views)} views · ${fmtPctPlain(e.conversion)}</span></li>`
+    ).join('');
+    return `<div class="quad-card ${def.cls}">
+      <div class="quad-card-head"><span class="quad-card-title">${def.title}</span><span class="quad-card-count">${list.length}</span></div>
+      <p class="quad-card-sub">${def.sub}</p>
+      <ul class="quad-list">${items || '<li class="quad-empty">Nenhum produto nessa faixa.</li>'}</ul>
+    </div>`;
+  }).join('') + `<p class="footnote" style="grid-column:1/-1; margin:2px 0 0;">Média do período: ${fmtInt.format(Math.round(avgViews))} views · ${fmtPctPlain(avgConv)} de conversão (${withViews.length} produtos com views registradas).</p>`;
+}
+
 function render(){
   const filterText = textFilterAbc.value;
   renderKPIs(filterText);
   const status = statusSelect.value;
   const r = buildRanking('revenue', filterText);
   const q = buildRanking('quantity', filterText);
+
+  const viewsByRef = viewsByRefForRange(startInput.value, endInput.value);
+  const qtyByRef = new Map(q.entries.map(e=>[e.ref, e.value]));
+  function attachViewsConv(entries){
+    entries.forEach(e=>{
+      const views = viewsByRef.get(e.ref) || 0;
+      const qty = qtyByRef.get(e.ref) || 0;
+      e.views = views;
+      e.conversion = views>0 ? qty/views*100 : null;
+    });
+  }
+  attachViewsConv(r.entries);
+  attachViewsConv(q.entries);
+  renderViewsQuadrants(q.entries);
+
   renderTable('table-receita', r.entries, 'revenue');
   renderTable('table-qtd', q.entries, 'quantity');
   try{

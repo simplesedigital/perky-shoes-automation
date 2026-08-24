@@ -67,6 +67,7 @@ STATE_FILES = [
     "historico_descontos.csv",
     "historico_estoque_eventos.csv",
     "historico_estoque_sku.csv",
+    "historico_pageviews.csv",
     "historico_vendas.json",
     "historico_vendas_sku.json",
     "orders_master.json",
@@ -639,6 +640,75 @@ def _sheets_api_get(spreadsheet_id, sheet_gid, want_grid_range=False):
         headers=auth_headers,
     )
     return _urlopen_json_retry(values_req).get("values", [])
+
+
+# ---------------- PARTE 2E: VISUALIZACOES DE PAGINA DE PRODUTO (GA4) ----------------
+# Usa o mesmo service account ja usado pro Sheets (ja tem acesso de leitura
+# concedido na propriedade GA4 "Perky Shoes"). A URL da PDP termina em
+# "-<id numerico da VNDA>"; cruzamos com o product_id que ja vem no snapshot
+# diario de estoque (historico_estoque_sku.csv) pra chegar na referencia.
+
+GA4_PROPERTY_ID = "316363343"
+
+
+def fetch_product_pageviews(days=90):
+    from google.oauth2 import service_account
+    import google.auth.transport.requests
+
+    creds = service_account.Credentials.from_service_account_file(
+        GOOGLE_SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/analytics.readonly"]
+    )
+    creds.refresh(google.auth.transport.requests.Request())
+    headers = {"Authorization": f"Bearer {creds.token}", "Content-Type": "application/json"}
+
+    id_to_ref = {}
+    estoque_path = os.path.join(BASE_DIR, "historico_estoque_sku.csv")
+    if os.path.isfile(estoque_path):
+        with open(estoque_path, encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                if r.get("product_id"):
+                    id_to_ref[r["product_id"]] = r["referencia"]
+
+    body = json.dumps({
+        "dateRanges": [{"startDate": f"{days}daysAgo", "endDate": "today"}],
+        "dimensions": [{"name": "date"}, {"name": "pagePath"}],
+        "metrics": [{"name": "screenPageViews"}],
+        "dimensionFilter": {"filter": {
+            "fieldName": "pagePath",
+            "stringFilter": {"matchType": "BEGINS_WITH", "value": "/produto/"},
+        }},
+        "limit": 100000,
+    }).encode()
+    req = urllib.request.Request(
+        f"https://analyticsdata.googleapis.com/v1beta/properties/{GA4_PROPERTY_ID}:runReport",
+        data=body, method="POST", headers=headers,
+    )
+    data = _urlopen_json_retry(req)
+
+    rows = []
+    unmatched_views = 0
+    for row in data.get("rows", []):
+        date_raw = row["dimensionValues"][0]["value"]  # YYYYMMDD
+        path = row["dimensionValues"][1]["value"]
+        views = int(row["metricValues"][0]["value"])
+        m = re.search(r"-(\d+)$", path.rstrip("/"))
+        ref = id_to_ref.get(m.group(1)) if m else None
+        if not ref:
+            unmatched_views += views
+            continue
+        rows.append([ref, f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}", views])
+
+    csv_path = os.path.join(BASE_DIR, "historico_pageviews.csv")
+    tmp_path = csv_path + f".tmp{os.getpid()}"
+    with open(tmp_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["referencia", "data", "views"])
+        writer.writerows(rows)
+    os.replace(tmp_path, csv_path)
+
+    print(f"[pageviews] {len(rows)} linhas salvas (ultimos {days} dias) | "
+          f"{unmatched_views} views sem referencia correspondente")
+    return rows
 
 
 def fetch_reposicoes_prazo():
@@ -1849,6 +1919,11 @@ def build_dashboard_data():
 
     stock_sku = csv_to_records("historico_estoque_sku.csv")
     discounts = csv_to_records("historico_descontos.csv")
+    pageviews_path = os.path.join(BASE_DIR, "historico_pageviews.csv")
+    pageviews_rows = []
+    if os.path.isfile(pageviews_path):
+        with open(pageviews_path, encoding="utf-8") as f:
+            pageviews_rows = [[r["referencia"], r["data"], int(r["views"])] for r in csv.DictReader(f)]
 
     for r in stock_sku:
         r["estoque"] = int(r["estoque"])
@@ -1926,6 +2001,7 @@ def build_dashboard_data():
     payload = {
         "sales_rows": sales["rows"],
         "sales_names": sales["names"],
+        "pageviews_rows": pageviews_rows,
         "stock_sku": stock_sku,
         "discounts": discounts,
         "orders_raw": orders_raw,
