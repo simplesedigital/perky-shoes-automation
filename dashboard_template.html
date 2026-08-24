@@ -1660,7 +1660,8 @@ function renderProductChart(sortedEntries, metric, gran, topn, status){
     throw new Error('Chart.js não carregou');
   }
   const start = startInput.value, end = endInput.value;
-  const topRefs = sortedEntries.slice(0, topn).map(e=>e.ref);
+  const topEntries = sortedEntries.slice(0, topn);
+  const topRefs = topEntries.map(e=>e.ref);
 
   const legendEl = document.getElementById('legend-produtos');
   const sparkEl = document.getElementById('sparkgrid-produtos');
@@ -1689,10 +1690,10 @@ function renderProductChart(sortedEntries, metric, gran, topn, status){
 
   sparkEl.style.display='none'; sparkEl.innerHTML='';
   wrapEl.style.display='block';
-  legendEl.innerHTML = topRefs.map((ref,i)=>`<span class="sw"><span class="dot" style="background:${seriesColor(i)}"></span>${ref}</span>`).join('');
-  const datasets = topRefs.map((ref,i)=>({
-    label: ref,
-    data: bucketKeys.map(bk=>valueAt(bk, ref)),
+  legendEl.innerHTML = topEntries.map((e,i)=>`<span class="sw"><span class="dot" style="background:${seriesColor(i)}"></span>${e.name}</span>`).join('');
+  const datasets = topEntries.map((e,i)=>({
+    label: e.name,
+    data: bucketKeys.map(bk=>valueAt(bk, e.ref)),
     spanGaps: true,
     borderColor: seriesColor(i), backgroundColor: seriesColor(i),
     borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15,
