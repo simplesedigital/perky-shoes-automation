@@ -459,6 +459,10 @@ tbody tr:last-child td{border-bottom:none;}
 
 <!-- ================= TOP TAB: VENDAS ================= -->
 <div class="panel" id="toppanel-vendas">
+  <div class="tabbar sub" role="tablist">
+    <button class="tabbtn" id="vdbtn-cupons" role="tab" aria-selected="true" onclick="switchVendasSub('cupons')">Cupons</button>
+  </div>
+
   <div class="card">
     <div class="filterbar">
       <div class="field">
@@ -482,18 +486,20 @@ tbody tr:last-child td{border-bottom:none;}
     </div>
   </div>
 
-  <div class="section-title">Cupons</div>
-  <p class="footnote" style="margin-top:-6px;">Considera só pedidos com cupom aplicado no período selecionado. Muitos códigos são gerados automaticamente (créditos, indicações) — os de maior volume costumam ser as campanhas reais.</p>
-  <div class="kpirow" id="cupons-kpirow"></div>
-  <div class="controls-row">
-    <div class="seg" id="seg-topn-cupons">
-      <button aria-pressed="true" data-v="10">Top 10</button>
-      <button aria-pressed="false" data-v="20">Top 20</button>
-      <button aria-pressed="false" data-v="50">Top 50</button>
+  <div class="subpanel active" id="vdpanel-cupons">
+    <div class="section-title">Cupons</div>
+    <p class="footnote" style="margin-top:-6px;">Considera só pedidos com cupom aplicado no período selecionado. Muitos códigos são gerados automaticamente (créditos, indicações) — os de maior volume costumam ser as campanhas reais.</p>
+    <div class="kpirow" id="cupons-kpirow"></div>
+    <div class="controls-row">
+      <div class="seg" id="seg-topn-cupons">
+        <button aria-pressed="true" data-v="10">Top 10</button>
+        <button aria-pressed="false" data-v="20">Top 20</button>
+        <button aria-pressed="false" data-v="50">Top 50</button>
+      </div>
     </div>
+    <div class="chartwrap" id="chartwrap-cupons" style="height:320px;"><canvas id="chart-cupons" role="img" aria-label="Pedidos por cupom"></canvas></div>
+    <div class="tablewrap maxh"><table id="table-cupons"><thead></thead><tbody></tbody></table></div>
   </div>
-  <div class="chartwrap" id="chartwrap-cupons" style="height:320px;"><canvas id="chart-cupons" role="img" aria-label="Pedidos por cupom"></canvas></div>
-  <div class="tablewrap maxh"><table id="table-cupons"><thead></thead><tbody></tbody></table></div>
 </div>
 
 <!-- ================= TOP TAB: PRODUTO ================= -->
@@ -1039,6 +1045,14 @@ function switchDepositoSub(name){
   ['prateleiras','expedicao'].forEach(n=>{
     document.getElementById('deppanel-'+n).classList.toggle('active', n===name);
     document.getElementById('depbtn-'+n).setAttribute('aria-selected', n===name);
+  });
+  syncDynamicSticky();
+}
+
+function switchVendasSub(name){
+  ['cupons'].forEach(n=>{
+    document.getElementById('vdpanel-'+n).classList.toggle('active', n===name);
+    document.getElementById('vdbtn-'+n).setAttribute('aria-selected', n===name);
   });
   syncDynamicSticky();
 }
