@@ -594,6 +594,24 @@ REPOSICOES_PRAZO_SHEET_GID = 1132947474
 GOOGLE_SERVICE_ACCOUNT_FILE = os.path.join(BASE_DIR, "google_service_account.json")
 
 
+def _urlopen_json_retry(req, max_retries=5, timeout=20):
+    """Como fetch_with_retry, mas tambem tolera erros transitorios do servidor
+    (5xx) alem de 429 - a API do Sheets solta 503 de vez em quando, e sem
+    retry isso derruba a sincronizacao inteira por um soluco passageiro."""
+    delay = 1.5
+    for _ in range(max_retries):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return json.loads(resp.read().decode())
+        except urllib.error.HTTPError as e:
+            if e.code == 429 or e.code >= 500:
+                time.sleep(delay)
+                delay *= 1.7
+                continue
+            raise
+    raise RuntimeError(f"max retries exceeded: {req.full_url}")
+
+
 def _sheets_api_get(spreadsheet_id, sheet_gid, want_grid_range=False):
     from google.oauth2 import service_account
     import google.auth.transport.requests
@@ -609,8 +627,7 @@ def _sheets_api_get(spreadsheet_id, sheet_gid, want_grid_range=False):
         f"https://sheets.googleapis.com/v4/spreadsheets/{spreadsheet_id}?fields=sheets.properties",
         headers=auth_headers,
     )
-    with urllib.request.urlopen(meta_req, timeout=20) as resp:
-        meta = json.loads(resp.read().decode())
+    meta = _urlopen_json_retry(meta_req)
     title = next(
         s["properties"]["title"] for s in meta["sheets"] if s["properties"]["sheetId"] == sheet_gid
     )
@@ -621,8 +638,7 @@ def _sheets_api_get(spreadsheet_id, sheet_gid, want_grid_range=False):
         f"?valueRenderOption=FORMATTED_VALUE",
         headers=auth_headers,
     )
-    with urllib.request.urlopen(values_req, timeout=20) as resp:
-        return json.loads(resp.read().decode()).get("values", [])
+    return _urlopen_json_retry(values_req).get("values", [])
 
 
 def fetch_reposicoes_prazo():
