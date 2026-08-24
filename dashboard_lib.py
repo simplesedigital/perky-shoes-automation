@@ -60,6 +60,7 @@ STATE_FILES = [
     "avise_me.json",
     "banco_enderecos_pedidos.json",
     "controle_prazo.json",
+    "cupons_promocoes.json",
     "dias_manuseio_gerenciados.json",
     "estoque_deposito.json",
     "expedicao.json",
@@ -712,6 +713,42 @@ def fetch_product_pageviews(days=90):
     print(f"[pageviews] {len(rows)} linhas salvas (ultimos {days} dias) | "
           f"{unmatched_views} views sem referencia correspondente")
     return rows
+
+
+# ---------------- PARTE 2F: MAPA CUPOM -> PROMOCAO (VNDA discounts) ----------------
+# Cada "discount" na VNDA e uma campanha/promocao (tem nome, ex: "Cupons Lojas
+# Fisicas Franquias"), e /discounts/{id}/coupons devolve os codigos de cupom
+# reais associados a ela - a peca que faltava pra ligar codigo -> nome legivel.
+
+def fetch_coupon_promotions():
+    all_discounts = []
+    page = 1
+    while True:
+        data = fetch_with_retry(f"https://api.vnda.com.br/api/v2/discounts?per_page=100&page={page}")
+        if not data:
+            break
+        all_discounts.extend(data)
+        page += 1
+        if len(data) < 100:
+            break
+
+    mapping = {}
+    erros = 0
+    for d in all_discounts:
+        try:
+            coupons = fetch_with_retry(f"https://api.vnda.com.br/api/v2/discounts/{d['id']}/coupons?per_page=100")
+        except urllib.error.HTTPError:
+            erros += 1
+            continue
+        for c in (coupons or []):
+            code = c.get("code")
+            if code:
+                mapping[code] = {"discount_id": d["id"], "discount_name": (d.get("name") or "").strip()}
+
+    save_json("cupons_promocoes.json", mapping)
+    print(f"[cupons-promocoes] {len(all_discounts)} promocoes verificadas ({erros} erros), "
+          f"{len(mapping)} codigos de cupom mapeados")
+    return mapping
 
 
 def fetch_reposicoes_prazo():
@@ -2013,6 +2050,7 @@ def build_dashboard_data():
         "sales_by_sku": sales_by_sku,
         "crosssell": crosssell,
         "avise_me": avise_me,
+        "cupons_promocoes": load_json("cupons_promocoes.json", {}),
         "reposicoes": reposicoes,
         "controle_prazo": controle_prazo,
         "estoque_deposito": estoque_deposito,

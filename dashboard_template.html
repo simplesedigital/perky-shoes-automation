@@ -475,6 +475,10 @@ tbody tr:last-child td{border-bottom:none;}
         <label for="f-text-cupons">Buscar cupom</label>
         <input type="text" id="f-text-cupons" placeholder="ex: boasvindas">
       </div>
+      <div class="field">
+        <label for="f-text-promocao">Nome da promoção</label>
+        <input type="text" id="f-text-promocao" placeholder="ex: franquias">
+      </div>
     </div>
   </div>
 
@@ -2170,18 +2174,27 @@ function renderTamanho(start, end, status){
   document.getElementById('tamanho-summary').textContent = `${fmtInt.format(totalQty)} pares vendidos no período`;
 }
 
+const cupomPromoMap = DATA.cupons_promocoes || {};
+function promoNameForCoupon(coupon){
+  const info = cupomPromoMap[coupon];
+  return info && info.discount_name ? info.discount_name : '';
+}
+
 const CUPONS_COLUMNS = [
   {key:'coupon', label:'Cupom', type:'text', format:r=>r.coupon, sortValue:r=>r.coupon},
+  {key:'promo', label:'Promoção', type:'text', format:r=>r.promo || '—', sortValue:r=>r.promo},
   {key:'pedidos', label:'Pedidos', type:'number', format:r=>fmtInt.format(r.pedidos), sortValue:r=>r.pedidos},
   {key:'receita', label:'Receita', type:'number', format:r=>fmtBRL.format(r.receita), sortValue:r=>r.receita},
   {key:'ticket', label:'Ticket médio', type:'number', format:r=>fmtBRL.format(r.ticket), sortValue:r=>r.ticket},
   {key:'desconto', label:'Desconto total', type:'number', format:r=>fmtBRL.format(r.desconto), sortValue:r=>r.desconto},
 ];
 const textFilterCupons = document.getElementById('f-text-cupons');
+const textFilterPromocao = document.getElementById('f-text-promocao');
 let topnCupons = 10;
 
 function renderCupons(start, end, status){
   const filterText = (textFilterCupons.value||'').trim().toLowerCase();
+  const filterPromo = (textFilterPromocao.value||'').trim().toLowerCase();
   const orders = filteredOrdersRaw(start, end, status);
   const byCoupon = new Map();
   let pedidosComCupom = 0, receitaComCupom = 0, descontoTotal = 0;
@@ -2190,6 +2203,7 @@ function renderCupons(start, end, status){
     const coupon = o[5];
     if(!coupon) return;
     if(filterText && !coupon.toLowerCase().includes(filterText)) return;
+    if(filterPromo && !promoNameForCoupon(coupon).toLowerCase().includes(filterPromo)) return;
     if(!byCoupon.has(coupon)) byCoupon.set(coupon, {pedidos:0, receita:0, desconto:0});
     const c = byCoupon.get(coupon);
     c.pedidos += 1;
@@ -2201,7 +2215,7 @@ function renderCupons(start, end, status){
   });
 
   const rows = Array.from(byCoupon.entries()).map(([coupon,v])=>({
-    coupon, pedidos: v.pedidos, receita: v.receita, desconto: v.desconto,
+    coupon, promo: promoNameForCoupon(coupon), pedidos: v.pedidos, receita: v.receita, desconto: v.desconto,
     ticket: v.pedidos>0 ? v.receita/v.pedidos : 0,
   })).sort((a,b)=> b.pedidos - a.pedidos);
 
@@ -2276,6 +2290,7 @@ function renderVendas(){
 }
 [vdStartInput, vdEndInput, vdStatusSelect].forEach(el=>el.addEventListener('change', renderVendas));
 textFilterCupons.addEventListener('input', renderVendas);
+textFilterPromocao.addEventListener('input', renderVendas);
 seg('seg-topn-cupons', v=>{topnCupons=+v; renderVendas();});
 attachSort('table-cupons', renderVendas);
 
