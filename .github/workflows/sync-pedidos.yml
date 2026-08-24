@@ -31,7 +31,7 @@ jobs:
         env:
           GITHUB_ACTIONS: "true"
           VNDA_API_TOKEN: ${{ secrets.VNDA_API_TOKEN }}
-          GITHUB_PAGES_TOKEN: ${{ secrets.GITHUB_PAGES_TOKEN }}
+          GITHUB_PAGES_TOKEN: ${{ secrets.PAGES_DEPLOY_TOKEN }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
