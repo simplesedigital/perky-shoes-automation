@@ -1507,10 +1507,13 @@ function buildRanking(metricKey, filterText){
   // senao um produto que vendeu antes e nao vende mais infla artificialmente o "vs
   // periodo anterior", como se a queda nao tivesse acontecido)
   let totalPrev = 0;
+  let prevRefCount = 0;
   prevAgg.forEach((o, ref) => {
     if(norm && !matchNameOrCode(norm, salesNames[ref]||ref, ref)) return;
     if(!matchCategoria(categoriaAbcSel, ref)) return;
-    totalPrev += metricKey==='revenue' ? o.revenue : o.qty;
+    const val = metricKey==='revenue' ? o.revenue : o.qty;
+    totalPrev += val;
+    if(val>0) prevRefCount++;
   });
 
   entries.forEach(e=>{
@@ -1522,7 +1525,7 @@ function buildRanking(metricKey, filterText){
     e.trend = trend;
   });
 
-  return {entries, totalCur: filteredTotal, totalPrev, dur, prevStart, prevEnd, totalRevCur: filteredTotal, totalQtyCur: filteredTotal};
+  return {entries, totalCur: filteredTotal, totalPrev, prevRefCount, dur, prevStart, prevEnd, totalRevCur: filteredTotal, totalQtyCur: filteredTotal};
 }
 
 function renderKPIs(filterText){
@@ -1532,6 +1535,10 @@ function renderKPIs(filterText){
   const revTrend = r.totalPrev>0 ? (r.totalRevCur-r.totalPrev)/r.totalPrev*100 : null;
   const qtyTrend = q.totalPrev>0 ? (q.totalQtyCur-q.totalPrev)/q.totalPrev*100 : null;
   const ticket = q.totalQtyCur>0 ? r.totalRevCur/q.totalQtyCur : 0;
+  const ticketPrev = q.totalPrev>0 ? r.totalPrev/q.totalPrev : 0;
+  const ticketTrend = ticketPrev>0 ? (ticket-ticketPrev)/ticketPrev*100 : null;
+  const refCount = r.entries.length;
+  const refTrend = r.prevRefCount>0 ? (refCount-r.prevRefCount)/r.prevRefCount*100 : null;
 
   function deltaHTML(t){
     if(t===null) return '<span class="delta flat">sem base de comparação</span>';
@@ -1543,8 +1550,8 @@ function renderKPIs(filterText){
   kpirow.innerHTML = `
     <div class="kpi"><p class="label">Receita no período</p><p class="value">${fmtBRL.format(r.totalRevCur)}</p>${deltaHTML(revTrend)}</div>
     <div class="kpi"><p class="label">Unidades vendidas</p><p class="value">${fmtInt.format(q.totalQtyCur)}</p>${deltaHTML(qtyTrend)}</div>
-    <div class="kpi"><p class="label">Ticket médio por unidade</p><p class="value">${fmtBRL.format(ticket)}</p><span class="delta flat">receita ÷ unidades no período</span></div>
-    <div class="kpi"><p class="label">Referências vendidas</p><p class="value">${fmtInt.format(r.entries.length)}</p><span class="delta flat">no período selecionado</span></div>
+    <div class="kpi"><p class="label">Ticket médio por unidade</p><p class="value">${fmtBRL.format(ticket)}</p>${deltaHTML(ticketTrend)}</div>
+    <div class="kpi"><p class="label">Referências vendidas</p><p class="value">${fmtInt.format(refCount)}</p>${deltaHTML(refTrend)}</div>
   `;
   document.getElementById('f-compare-hint').textContent =
     `Comparando com ${r.prevStart} a ${r.prevEnd} (${r.dur} dias)`;
