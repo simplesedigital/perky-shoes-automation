@@ -372,6 +372,7 @@ tbody tr:last-child td{border-bottom:none;}
     <button class="tabbtn" id="padbtn-periodo" role="tab" aria-selected="true" onclick="switchPadroesSub('periodo')">Período</button>
     <button class="tabbtn" id="padbtn-regiao" role="tab" aria-selected="false" onclick="switchPadroesSub('regiao')">Região</button>
     <button class="tabbtn" id="padbtn-tamanho" role="tab" aria-selected="false" onclick="switchPadroesSub('tamanho')">Tamanho</button>
+    <button class="tabbtn" id="padbtn-cupons" role="tab" aria-selected="false" onclick="switchPadroesSub('cupons')">Cupons</button>
   </div>
 
   <div class="card">
@@ -393,6 +394,10 @@ tbody tr:last-child td{border-bottom:none;}
       <div class="field" id="field-tamanho-search" style="display:none;">
         <label for="f-text-tamanho">Buscar produto</label>
         <input type="text" id="f-text-tamanho" placeholder="ex: alpargata">
+      </div>
+      <div class="field" id="field-cupons-search" style="display:none;">
+        <label for="f-text-cupons">Buscar cupom</label>
+        <input type="text" id="f-text-cupons" placeholder="ex: boasvindas">
       </div>
       <span class="hint" id="fp-compare-hint"></span>
     </div>
@@ -452,6 +457,21 @@ tbody tr:last-child td{border-bottom:none;}
     <p class="footnote" id="tamanho-summary"></p>
     <div class="chartwrap" id="chartwrap-tamanho" style="height:280px;"><canvas id="chart-tamanho" role="img" aria-label="Receita e quantidade vendida por tamanho"></canvas></div>
     <div class="tablewrap maxh"><table id="table-tamanho"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="padpanel-cupons">
+    <div class="section-title">Cupons</div>
+    <p class="footnote" style="margin-top:-6px;">Considera só pedidos com cupom aplicado no período selecionado. Muitos códigos são gerados automaticamente (créditos, indicações) — os de maior volume costumam ser as campanhas reais.</p>
+    <div class="kpirow" id="cupons-kpirow"></div>
+    <div class="controls-row">
+      <div class="seg" id="seg-topn-cupons">
+        <button aria-pressed="true" data-v="10">Top 10</button>
+        <button aria-pressed="false" data-v="20">Top 20</button>
+        <button aria-pressed="false" data-v="50">Top 50</button>
+      </div>
+    </div>
+    <div class="chartwrap" id="chartwrap-cupons" style="height:320px;"><canvas id="chart-cupons" role="img" aria-label="Pedidos por cupom"></canvas></div>
+    <div class="tablewrap maxh"><table id="table-cupons"><thead></thead><tbody></tbody></table></div>
   </div>
 </div>
 
@@ -984,12 +1004,13 @@ function switchTab(name){
 }
 
 function switchPadroesSub(name){
-  ['periodo','regiao','tamanho'].forEach(n=>{
+  ['periodo','regiao','tamanho','cupons'].forEach(n=>{
     document.getElementById('padpanel-'+n).classList.toggle('active', n===name);
     document.getElementById('padbtn-'+n).setAttribute('aria-selected', n===name);
   });
   document.getElementById('field-tamanho-search').style.display = name==='tamanho' ? '' : 'none';
   document.getElementById('field-tamanho-categoria').style.display = name==='tamanho' ? '' : 'none';
+  document.getElementById('field-cupons-search').style.display = name==='cupons' ? '' : 'none';
   syncDynamicSticky();
 }
 
@@ -2132,6 +2153,54 @@ function renderTamanho(start, end, status){
   document.getElementById('tamanho-summary').textContent = `${fmtInt.format(totalQty)} pares vendidos no período`;
 }
 
+const CUPONS_COLUMNS = [
+  {key:'coupon', label:'Cupom', type:'text', format:r=>r.coupon, sortValue:r=>r.coupon},
+  {key:'pedidos', label:'Pedidos', type:'number', format:r=>fmtInt.format(r.pedidos), sortValue:r=>r.pedidos},
+  {key:'receita', label:'Receita', type:'number', format:r=>fmtBRL.format(r.receita), sortValue:r=>r.receita},
+  {key:'ticket', label:'Ticket médio', type:'number', format:r=>fmtBRL.format(r.ticket), sortValue:r=>r.ticket},
+  {key:'desconto', label:'Desconto total', type:'number', format:r=>fmtBRL.format(r.desconto), sortValue:r=>r.desconto},
+];
+const textFilterCupons = document.getElementById('f-text-cupons');
+let topnCupons = 10;
+
+function renderCupons(start, end, status){
+  const filterText = (textFilterCupons.value||'').trim().toLowerCase();
+  const orders = filteredOrdersRaw(start, end, status);
+  const byCoupon = new Map();
+  let pedidosComCupom = 0, receitaComCupom = 0, descontoTotal = 0;
+
+  orders.forEach(o=>{
+    const coupon = o[5];
+    if(!coupon) return;
+    if(filterText && !coupon.toLowerCase().includes(filterText)) return;
+    if(!byCoupon.has(coupon)) byCoupon.set(coupon, {pedidos:0, receita:0, desconto:0});
+    const c = byCoupon.get(coupon);
+    c.pedidos += 1;
+    c.receita += o[3];
+    c.desconto += (o[6]||0);
+    pedidosComCupom += 1;
+    receitaComCupom += o[3];
+    descontoTotal += (o[6]||0);
+  });
+
+  const rows = Array.from(byCoupon.entries()).map(([coupon,v])=>({
+    coupon, pedidos: v.pedidos, receita: v.receita, desconto: v.desconto,
+    ticket: v.pedidos>0 ? v.receita/v.pedidos : 0,
+  })).sort((a,b)=> b.pedidos - a.pedidos);
+
+  const pctPedidos = orders.length>0 ? pedidosComCupom/orders.length*100 : 0;
+  document.getElementById('cupons-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Pedidos com cupom</p><p class="value">${fmtInt.format(pedidosComCupom)}</p><span class="delta flat">${fmtPctPlain(pctPedidos)} dos pedidos do período</span></div>
+    <div class="kpi"><p class="label">Receita com cupom</p><p class="value">${fmtBRL.format(receitaComCupom)}</p><span class="delta flat">soma dos pedidos com cupom</span></div>
+    <div class="kpi"><p class="label">Desconto total dado</p><p class="value">${fmtBRL.format(descontoTotal)}</p><span class="delta flat">soma do valor descontado</span></div>
+    <div class="kpi"><p class="label">Cupons distintos</p><p class="value">${fmtInt.format(rows.length)}</p><span class="delta flat">usados no período/filtro atual</span></div>
+  `;
+
+  const top = rows.slice(0, topnCupons);
+  renderBarChart('chart-cupons', top.map(r=>r.coupon), top.map(r=>r.pedidos), 'Pedidos');
+  renderSortableTable('table-cupons', CUPONS_COLUMNS, rows);
+}
+
 function renderPadroes(){
   const start = fpStartInput.value, end = fpEndInput.value, status = fpStatusSelect.value;
   if(!start || !end) return;
@@ -2155,6 +2224,7 @@ function renderPadroes(){
     renderMonth(orders, start, end);
     renderGeo(orders);
     renderTamanho(start, end, status);
+    renderCupons(start, end, status);
   }catch(err){
     console.error('Falha ao renderizar Padrões:', err);
   }
@@ -2162,7 +2232,9 @@ function renderPadroes(){
 [fpStartInput, fpEndInput, fpStatusSelect].forEach(el=>el.addEventListener('change', renderPadroes));
 textFilterTamanho.addEventListener('input', ()=>renderTamanho(fpStartInput.value, fpEndInput.value, fpStatusSelect.value));
 categoriaTamanhoSel.addEventListener('change', ()=>renderTamanho(fpStartInput.value, fpEndInput.value, fpStatusSelect.value));
-['table-weekday','table-monthday','table-hour','table-turno','table-month','table-state','table-city','table-tamanho'].forEach(id=>attachSort(id, renderPadroes));
+textFilterCupons.addEventListener('input', ()=>renderCupons(fpStartInput.value, fpEndInput.value, fpStatusSelect.value));
+seg('seg-topn-cupons', v=>{topnCupons=+v; renderCupons(fpStartInput.value, fpEndInput.value, fpStatusSelect.value);});
+['table-weekday','table-monthday','table-hour','table-turno','table-month','table-state','table-city','table-tamanho','table-cupons'].forEach(id=>attachSort(id, renderPadroes));
 
 /* ---------------- TAB 2: ESTOQUE POR DIA ---------------- */
 

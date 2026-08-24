@@ -243,7 +243,10 @@ def _process_order(o, ref_agg, sku_sales):
             rec[1] = round(rec[1] + revenue, 2)
         item_list.append({"ref": ref, "sku": sku, "qty": qty, "revenue": revenue, "name": name})
 
-    master_row = {"code": code, "date": order_date, "hour": hour, "status": status, "total": total}
+    master_row = {
+        "code": code, "date": order_date, "hour": hour, "status": status, "total": total,
+        "coupon_code": o.get("coupon_code"), "discount_price": o.get("discount_price") or 0.0,
+    }
     return master_row, item_list
 
 
@@ -1935,7 +1938,8 @@ def build_dashboard_data():
         r["desconto_pct"] = float(r["desconto_pct"]) if r["desconto_pct"] else 0.0
 
     orders_master = load_json("orders_master.json", [])
-    orders_raw = [[o["code"], o["date"], o["status"], round(o["total"] or 0.0, 2), o.get("hour")]
+    orders_raw = [[o["code"], o["date"], o["status"], round(o["total"] or 0.0, 2), o.get("hour"),
+                   o.get("coupon_code"), round(o.get("discount_price") or 0.0, 2)]
                   for o in orders_master if o["date"]]
 
     addr_db = load_json("banco_enderecos_pedidos.json", {})
