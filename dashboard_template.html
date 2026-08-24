@@ -361,14 +361,14 @@ tbody tr:last-child td{border-bottom:none;}
 </div>
 
 <div class="tabbar" id="top-tabbar" role="tablist">
-  <button class="tabbtn" id="topbtn-padroes" role="tab" aria-selected="true" onclick="switchTopTab('padroes')">Padrões</button>
+  <button class="tabbtn" id="topbtn-vendas" role="tab" aria-selected="true" onclick="switchTopTab('vendas')">Vendas</button>
   <button class="tabbtn" id="topbtn-produto" role="tab" aria-selected="false" onclick="switchTopTab('produto')">Produto</button>
   <button class="tabbtn" id="topbtn-deposito" role="tab" aria-selected="false" onclick="switchTopTab('deposito')">Logística</button>
-  <button class="tabbtn" id="topbtn-vendas" role="tab" aria-selected="false" onclick="switchTopTab('vendas')">Vendas</button>
+  <button class="tabbtn" id="topbtn-padroes" role="tab" aria-selected="false" onclick="switchTopTab('padroes')">Padrões</button>
 </div>
 
 <!-- ================= TOP TAB: PADRÕES ================= -->
-<div class="panel active" id="toppanel-padroes">
+<div class="panel" id="toppanel-padroes">
   <div class="tabbar sub" role="tablist">
     <button class="tabbtn" id="padbtn-periodo" role="tab" aria-selected="true" onclick="switchPadroesSub('periodo')">Período</button>
     <button class="tabbtn" id="padbtn-regiao" role="tab" aria-selected="false" onclick="switchPadroesSub('regiao')">Região</button>
@@ -458,7 +458,7 @@ tbody tr:last-child td{border-bottom:none;}
 </div>
 
 <!-- ================= TOP TAB: VENDAS ================= -->
-<div class="panel" id="toppanel-vendas">
+<div class="panel active" id="toppanel-vendas">
   <div class="tabbar sub" role="tablist">
     <button class="tabbtn" id="vdbtn-cupons" role="tab" aria-selected="true" onclick="switchVendasSub('cupons')">Cupons</button>
   </div>
@@ -1019,7 +1019,6 @@ function switchTopTab(name){
     document.getElementById('topbtn-'+n).setAttribute('aria-selected', n===name);
   });
   if(name==='deposito'){ safeRun(renderDepositoSaudeCharts, 'gráfico do Depósito'); safeRun(renderExpedicao, 'painel de Expedição'); }
-  if(name==='vendas'){ safeRun(renderVendas, 'painel de Vendas'); }
   syncDynamicSticky();
 }
 
@@ -3563,6 +3562,7 @@ function safeRun(fn, label){
   try{ fn(); }
   catch(err){ console.error('Falha ao inicializar ' + label + ':', err); }
 }
+safeRun(renderVendas, 'aba Vendas');
 safeRun(renderPadroes, 'aba Padrões');
 safeRun(render, 'aba Curva ABC');
 safeRun(renderEstoque, 'aba Estoque por dia');
