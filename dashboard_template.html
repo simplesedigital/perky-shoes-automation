@@ -1,0 +1,3352 @@
+<meta charset="utf-8">
+<title>Dashboard E-commerce — Perky Shoes</title>
+<h2 class="sr-only">Painel de curva ABC de produtos da Perky Shoes, com ranking por receita e por quantidade, tendência de vendas, participação no total da loja, histórico diário de estoque por SKU e por referência, e histórico diário de descontos de remarcação</h2>
+
+<style>
+:root{
+  color-scheme: light;
+  --surface-0:#f9f9f7; --surface-1:#fcfcfb; --surface-2:#ffffff;
+  --text-primary:#0b0b0b; --text-secondary:#52514e; --text-muted:#898781;
+  --border:rgba(11,11,11,0.10); --border-strong:rgba(11,11,11,0.18);
+  --grid:#e1e0d9; --baseline:#c3c2b7;
+  --accent:#2a78d6; --accent-ink:#0d366b; --accent-bg:#e6f1fb;
+  --good:#0ca30c; --good-bg:#e7f6e7; --good-ink:#0a6b0a;
+  --warn:#c98500; --warn-bg:#fdf1da; --warn-ink:#8a5c00;
+  --crit:#d03b3b; --crit-bg:#fbe9e9; --crit-ink:#96201f;
+  --orange:#c0601a; --orange-bg:#fbeade; --orange-ink:#833f0f;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  --radius:8px; --font-sans: system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono: ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --surface-0:#0d0d0d; --surface-1:#1a1a19; --surface-2:#201f1e;
+    --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+    --border:rgba(255,255,255,0.10); --border-strong:rgba(255,255,255,0.18);
+    --grid:#2c2c2a; --baseline:#383835;
+    --accent:#3987e5; --accent-ink:#cde2fb; --accent-bg:#0f2438;
+    --good:#0ca30c; --good-bg:#0f2a0f; --good-ink:#7fdc7f;
+    --warn:#fab219; --warn-bg:#332705; --warn-ink:#ffce6b;
+    --crit:#e66767; --crit-bg:#3a1414; --crit-ink:#ff9d9d;
+    --orange:#f0954a; --orange-bg:#3a2410; --orange-ink:#ffb27a;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#3ab53a; --s7:#9085e9; --s8:#e66767;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --surface-0:#0d0d0d; --surface-1:#1a1a19; --surface-2:#201f1e;
+  --text-primary:#ffffff; --text-secondary:#c3c2b7; --text-muted:#898781;
+  --border:rgba(255,255,255,0.10); --border-strong:rgba(255,255,255,0.18);
+  --grid:#2c2c2a; --baseline:#383835;
+  --accent:#3987e5; --accent-ink:#cde2fb; --accent-bg:#0f2438;
+  --good:#0ca30c; --good-bg:#0f2a0f; --good-ink:#7fdc7f;
+  --warn:#fab219; --warn-bg:#332705; --warn-ink:#ffce6b;
+  --crit:#e66767; --crit-bg:#3a1414; --crit-ink:#ff9d9d;
+  --orange:#f0954a; --orange-bg:#3a2410; --orange-ink:#ffb27a;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#3ab53a; --s7:#9085e9; --s8:#e66767;
+}
+*{box-sizing:border-box;}
+html{overflow-anchor:none;}
+body{background:var(--surface-0); color:var(--text-primary); font-family:var(--font-sans); margin:0; padding:1.25rem; font-size:14px; line-height:1.5;}
+.sr-only{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap;}
+.pageheader{display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;}
+#sticky-wrap{display:none; position:sticky; top:0; margin-top:-1.25rem; padding-top:1.25rem; z-index:20; background:var(--surface-0); border-bottom:1px solid var(--border);}
+h1{font-size:19px; font-weight:600; margin:0 0 2px;}
+.subtitle{color:var(--text-secondary); font-size:12px; margin:0 0 1rem;}
+.tabbar{display:flex; gap:4px; background:var(--surface-1); padding:4px; border-radius:var(--radius); margin-bottom:1rem; max-width:640px;}
+.tabbar.sub{max-width:520px; margin-bottom:1.25rem; background:transparent; padding:0; border-bottom:1px solid var(--border); border-radius:0; gap:16px;}
+.tabbar.sub .tabbtn{flex:none; padding:8px 2px; border-radius:0; font-weight:500; color:var(--text-muted);}
+.tabbar.sub .tabbtn[aria-selected="true"]{background:transparent; box-shadow:none; color:var(--text-primary); border-bottom:2px solid var(--accent); margin-bottom:-1px;}
+.tabbtn{flex:1; padding:8px 10px; border:none; background:transparent; color:var(--text-secondary); font-size:13px; font-weight:600; border-radius:6px; cursor:pointer; font-family:var(--font-sans);}
+.tabbtn[aria-selected="true"]{background:var(--surface-2); color:var(--text-primary); box-shadow:0 0 0 1px var(--border);}
+.panel{display:none;}
+.panel.active{display:block;}
+.subpanel{display:none;}
+.subpanel.active{display:block;}
+.card{background:var(--surface-1); border-radius:12px; padding:1rem 1.1rem; margin-bottom:1rem;}
+.filterbar{display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end;}
+.field{display:flex; flex-direction:column; gap:4px;}
+.field label{font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em;}
+input[type="date"], input[type="text"], input[type="number"], select{
+  background:var(--surface-2); color:var(--text-primary); border:1px solid var(--border-strong);
+  border-radius:6px; padding:6px 8px; font-size:13px; font-family:var(--font-sans);
+  height:33px; box-sizing:border-box;
+}
+input[type="text"]{min-width:180px;}
+input[type="number"]{width:80px;}
+thead th.sortable{cursor:pointer; user-select:none;}
+thead th.sortable:hover{color:var(--text-primary);}
+.sort-arrow{color:var(--accent); font-size:10px;}
+.hint{font-size:12px; color:var(--text-muted); margin-left:auto; align-self:center;}
+.infotip{position:relative; display:inline-flex; align-items:center; justify-content:center; width:14px; height:14px; margin-left:5px; border-radius:50%; background:var(--surface-2); border:1px solid var(--border-strong); color:var(--text-muted); font-size:10px; font-weight:700; font-style:normal; text-transform:none; cursor:help; vertical-align:middle; flex-shrink:0;}
+.infotip.infotip-warn{background:var(--warn-bg); border-color:var(--warn-ink); color:var(--warn-ink);}
+.infotip.infotip-plain{width:auto; height:auto; min-width:0; margin-left:0; padding:0; border-radius:0; background:transparent; border:none; color:inherit; font-size:inherit; font-weight:inherit; text-decoration:none;}
+.infotip .tooltip-box{display:none; position:fixed; width:230px; background:var(--surface-2); color:var(--text-primary); border:1px solid var(--border-strong); border-radius:8px; padding:8px 10px; font-size:11.5px; font-weight:400; text-transform:none; text-align:left; line-height:1.4; box-shadow:0 4px 16px rgba(0,0,0,.25); z-index:9999; white-space:normal; cursor:auto;}
+.infotip-spacer{display:inline-block; width:14px; margin-left:5px;}
+.num-with-icon{display:inline-flex; align-items:center; justify-content:flex-end; width:100%;}
+.section-title-row{display:flex; align-items:center; gap:8px; position:relative;}
+.capacidade-layout{display:grid; grid-template-columns:1fr 280px; gap:20px; align-items:stretch; margin-bottom:1.25rem;}
+.capacidade-esquerda{display:flex; flex-direction:column; gap:12px; min-width:0;}
+.capacidade-ilustracao{background:var(--surface-1); border-radius:12px; padding:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;}
+.capacidade-ilustracao img{width:100%; height:auto; max-height:190px; object-fit:contain;}
+.capacidade-ilustracao-label{font-size:12px; font-weight:600; color:var(--text-secondary); text-align:center; margin:0;}
+@media (max-width:820px){ .capacidade-layout{grid-template-columns:1fr;} }
+
+.projecao-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; margin-bottom:1.25rem;}
+.projecao-card{background:var(--surface-1); border-radius:12px; padding:14px; display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;}
+.projecao-card .projecao-semana{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-muted);}
+.projecao-card img{width:100%; max-width:140px; height:auto;}
+.projecao-card .projecao-pct{font-size:22px; font-weight:700; font-variant-numeric:tabular-nums;}
+.projecao-card .projecao-label{font-size:11.5px; color:var(--text-secondary); margin:0;}
+.projecao-card .projecao-repo{font-size:10.5px; color:var(--good-ink); margin:0;}
+@media (max-width:720px){ .projecao-grid{grid-template-columns:repeat(2, 1fr);} }
+.meters-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:12px;}
+.meter-card{background:var(--surface-1); border-radius:12px; padding:1rem 1.1rem;}
+.meter-card .meter-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:8px;}
+.meter-card .meter-title{font-size:13px; font-weight:600; color:var(--text-primary);}
+.meter-card .meter-pct{font-size:20px; font-weight:700; font-variant-numeric:tabular-nums;}
+.meter-track{position:relative; height:10px; border-radius:6px; background:var(--surface-2); box-shadow:inset 0 0 0 1px var(--border); overflow:hidden;}
+.meter-fill{position:absolute; inset:0 auto 0 0; height:100%; border-radius:6px; background:var(--accent); transition:width .3s ease;}
+.meter-fill.warn{background:var(--warn);}
+.meter-fill.crit{background:var(--crit);}
+.meter-foot{display:flex; justify-content:space-between; margin-top:7px; font-size:11.5px; color:var(--text-muted); font-variant-numeric:tabular-nums;}
+.meter-foot .excedente{color:var(--crit-ink); font-weight:600;}
+
+.saude-layout{display:grid; grid-template-columns:420px 1fr 300px; gap:20px; align-items:stretch; margin-bottom:1.25rem;}
+.saude-left{display:flex; gap:16px; align-items:flex-start; min-width:0;}
+.saude-donut-wrap{position:relative; width:200px; height:200px; flex-shrink:0;}
+.saude-legend{display:flex; flex-direction:column; gap:5px; font-size:12px; flex:1; min-width:0;}
+.saude-legend-item{display:flex; align-items:center; gap:6px; color:var(--text-secondary);}
+.saude-legend-swatch{width:9px; height:9px; border-radius:2px; flex-shrink:0;}
+.saude-legend-pct{margin-left:auto; padding-left:8px; font-variant-numeric:tabular-nums; color:var(--text-primary); flex-shrink:0;}
+.saude-kpis{display:grid; grid-template-columns:repeat(2, minmax(140px,1fr)); gap:10px; align-content:center;}
+.saude-blocos-col{display:flex; flex-direction:column; gap:10px;}
+.saude-bloco{flex-grow:1; flex-basis:60px; min-height:60px; border-radius:12px; padding:14px 18px; display:flex; flex-direction:column; justify-content:center; gap:2px;}
+.saude-bloco-pct{font-size:22px; font-weight:700; font-variant-numeric:tabular-nums;}
+.saude-bloco-label{font-size:12px;}
+@media (max-width:720px){ .saude-layout{grid-template-columns:1fr;} .saude-left{flex-direction:column; align-items:center; text-align:center;} }
+
+.exp-flow{display:flex; align-items:stretch; gap:0; overflow-x:auto; padding:4px 2px; margin-bottom:12px;}
+.exp-step{background:var(--surface-1); border-radius:12px; padding:14px 16px; min-width:150px; flex:1; display:flex; flex-direction:column; gap:4px; justify-content:center;}
+.exp-step-label{font-size:12px; color:var(--text-secondary); line-height:1.3;}
+.exp-step-value{font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--text-primary);}
+.exp-step-hint{font-size:11px; color:var(--text-muted);}
+.exp-step.disabled{background:transparent; box-shadow:inset 0 0 0 1.5px var(--border-strong); border-radius:12px;}
+.exp-step.disabled .exp-step-value{font-size:13px; font-weight:500; color:var(--text-muted);}
+.exp-arrow{display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:20px; padding:0 6px; flex-shrink:0;}
+.exp-branch{display:flex; align-items:center; gap:10px; margin-top:2px; padding:10px 16px; border-radius:12px; background:var(--crit-bg); color:var(--crit-ink); font-size:13px;}
+.exp-branch b{font-size:16px; font-variant-numeric:tabular-nums;}
+@media (max-width:900px){ .exp-flow{flex-wrap:wrap;} .exp-arrow{display:none;} .exp-step{min-width:130px;} }
+
+.warehouse-map{display:flex; gap:18px; align-items:stretch; overflow-x:auto; height:100%;}
+.wh-corredor{display:flex; flex-direction:column; align-items:center; gap:6px; flex-shrink:0;}
+.wh-corredor-label{font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted); margin-bottom:2px; flex-shrink:0;}
+.wh-lados{display:flex; gap:10px; flex:1; min-height:0;}
+.wh-lado{display:flex; flex-direction:column; gap:4px; flex:1; min-height:0;}
+.wh-lado-label{font-size:9.5px; color:var(--text-muted); text-align:center; text-transform:uppercase; letter-spacing:.03em; flex-shrink:0;}
+.wh-estante{width:44px; flex:1; min-height:22px; border-radius:4px; display:flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:700; color:#fff; cursor:pointer; box-shadow:0 0 0 1px var(--border); position:relative; border:none; padding:0; font-family:var(--font-sans);}
+.wh-estante.selected{box-shadow:0 0 0 2px var(--text-primary);}
+.wh-estante .wh-tip{display:none; position:fixed; width:180px; background:var(--surface-2); color:var(--text-primary); border:1px solid var(--border-strong); border-radius:8px; padding:8px 10px; font-size:11.5px; font-weight:400; line-height:1.4; box-shadow:0 4px 16px rgba(0,0,0,.25); z-index:9999; text-align:left;}
+.wh-estante:hover .wh-tip, .wh-estante:focus-visible .wh-tip{display:block;}
+.wh-legend{display:flex; flex-wrap:wrap; gap:14px; font-size:12px; color:var(--text-secondary); margin-bottom:1.25rem;}
+.wh-legend-item{display:flex; align-items:center; gap:6px;}
+.wh-legend-swatch{width:12px; height:12px; border-radius:4px; flex-shrink:0;}
+
+.wh-drilldown{display:grid; grid-template-columns:minmax(300px,1.3fr) 240px minmax(280px,1fr); gap:14px; align-items:stretch;}
+.wh-col{background:var(--surface-1); border-radius:12px; padding:14px; min-height:340px; display:flex; flex-direction:column;}
+.wh-col > *:last-child{flex:1;}
+.wh-col-title{font-size:12.5px; font-weight:600; color:var(--text-secondary); margin-bottom:10px;}
+.wh-estante-detail{display:flex; flex-direction:column; gap:6px;}
+.wh-andar-row{border-radius:8px; padding:8px 10px; cursor:pointer; border:1px solid var(--border-strong); background:var(--surface-2); transition:border-color .12s;}
+.wh-andar-row:hover{border-color:var(--accent);}
+.wh-andar-row.selected{border-color:var(--accent); box-shadow:0 0 0 1px var(--accent);}
+.wh-andar-row .wh-andar-head{display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px; font-variant-numeric:tabular-nums;}
+.wh-andar-bar{height:6px; border-radius:4px; background:var(--surface-1); overflow:hidden;}
+.wh-andar-fill{height:100%; border-radius:4px;}
+.wh-empty-hint{color:var(--text-muted); font-size:12.5px; text-align:center; padding:2.5rem 1rem;}
+@media (max-width:900px){ .wh-drilldown{grid-template-columns:1fr;} }
+.pii-toggle{display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border:none; background:transparent; color:var(--text-muted); cursor:pointer; padding:0; flex-shrink:0; position:relative; top:7px;}
+.pii-toggle:hover{color:var(--text-primary);}
+.pii-toggle svg{width:15px; height:15px;}
+.pii-toggle .icon-eye-open{display:none;}
+.pii-toggle.is-open .icon-eye-closed{display:none;}
+.pii-toggle.is-open .icon-eye-open{display:block;}
+.pii-popover{display:none; position:absolute; top:32px; left:0; z-index:50; align-items:center; gap:6px; background:var(--surface-1); border:1px solid var(--border-strong); border-radius:var(--radius); padding:10px; box-shadow:0 8px 30px rgba(0,0,0,.35);}
+.pii-popover.open{display:flex;}
+.pii-popover input[type="password"]{width:130px; margin:0;}
+.pii-popover-btn{background:var(--surface-2); color:var(--text-primary); border:1px solid var(--border-strong); border-radius:6px; padding:0 10px; height:33px; font-size:12.5px; cursor:pointer; font-family:var(--font-sans); white-space:nowrap;}
+.pii-popover-btn:hover{border-color:var(--accent);}
+.pii-popover-error{font-size:11.5px; color:var(--crit); white-space:nowrap;}
+.dr-trigger{display:inline-flex; align-items:center; gap:6px; background:var(--surface-2); color:var(--text-primary); border:1px solid var(--border-strong); border-radius:6px; padding:6px 10px; font-size:13px; font-family:var(--font-sans); height:33px; box-sizing:border-box; cursor:pointer; white-space:nowrap;}
+.dr-trigger:hover{border-color:var(--accent);}
+.dr-popup{display:none; position:fixed; background:var(--surface-1); border:1px solid var(--border-strong); border-radius:var(--radius); box-shadow:0 8px 30px rgba(0,0,0,.35); padding:14px; z-index:9999;}
+.dr-presets{display:flex; flex-wrap:nowrap; gap:6px; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--border);}
+.dr-presets button{background:var(--surface-2); color:var(--text-secondary); border:1px solid var(--border); border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer; font-family:var(--font-sans); white-space:nowrap; flex:none;}
+.dr-presets button:hover{border-color:var(--accent); color:var(--text-primary);}
+.dr-presets button.active{background:var(--accent); color:#fff; border-color:var(--accent);}
+.dr-calendars{display:flex; gap:20px; position:relative;}
+.dr-cal{width:230px;}
+.dr-cal-head{display:flex; align-items:center; justify-content:center; margin-bottom:8px; font-size:13px; font-weight:600; color:var(--text-primary); position:relative;}
+.dr-cal-nav{position:absolute; top:0; left:0; right:0; display:flex; justify-content:space-between; pointer-events:none;}
+.dr-cal-nav button{pointer-events:auto; background:none; border:none; color:var(--text-secondary); cursor:pointer; font-size:16px; padding:2px 6px; line-height:1;}
+.dr-cal-nav button:hover{color:var(--text-primary);}
+.dr-cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:2px; font-size:12px; text-align:center;}
+.dr-cal-dow{color:var(--text-muted); font-size:10px; padding:4px 0;}
+.dr-cal-day{padding:6px 0; cursor:pointer; border-radius:4px; color:var(--text-primary);}
+.dr-cal-day:hover{background:var(--surface-2);}
+.dr-cal-day.dr-disabled{color:var(--text-muted); pointer-events:none; opacity:.35;}
+.dr-cal-day.dr-in-range{background:var(--accent-bg); border-radius:0;}
+.dr-cal-day.dr-range-start{background:var(--accent); color:#fff; border-radius:4px 0 0 4px;}
+.dr-cal-day.dr-range-end{background:var(--accent); color:#fff; border-radius:0 4px 4px 0;}
+.dr-cal-day.dr-range-single{background:var(--accent); color:#fff; border-radius:4px;}
+.dr-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--border);}
+.dr-actions button{border-radius:6px; padding:7px 14px; font-size:13px; cursor:pointer; font-family:var(--font-sans); border:1px solid var(--border);}
+.dr-cancel{background:transparent; color:var(--text-secondary);}
+.dr-apply{background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600;}
+.kpirow{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:1rem;}
+.kpi{background:var(--surface-1); border-radius:var(--radius); padding:1rem;}
+.kpi .label{font-size:12px; color:var(--text-secondary); margin:0 0 4px;}
+.kpi .value{font-size:24px; font-weight:600; margin:0; font-variant-numeric:tabular-nums;}
+.kpi .delta{font-size:12px; margin:4px 0 0; display:flex; align-items:center; gap:3px; font-variant-numeric:tabular-nums;}
+.delta.up{color:var(--good);} .delta.down{color:var(--crit);} .delta.flat{color:var(--text-muted);}
+.section-title{font-size:16px; font-weight:600; margin:1.5rem 0 .6rem;}
+.controls-row{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:.75rem;}
+.seg{display:flex; background:var(--surface-1); border-radius:6px; padding:3px; gap:2px;}
+.seg button{border:none; background:transparent; color:var(--text-secondary); font-size:12px; padding:5px 9px; border-radius:4px; cursor:pointer; font-family:var(--font-sans);}
+.seg button[aria-pressed="true"]{background:var(--surface-2); color:var(--text-primary); box-shadow:0 0 0 1px var(--border);}
+.switchbar{display:inline-flex; align-items:center; gap:8px; cursor:pointer; user-select:none;}
+.switchbar .switchlabel{font-size:12px; color:var(--text-secondary); font-family:var(--font-sans);}
+.switch{position:relative; display:inline-flex; align-items:center; width:40px; height:22px; flex:none; cursor:pointer;}
+.switch input{position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer;}
+.switch-track{position:absolute; inset:0; background:var(--surface-2); border:1px solid var(--border-strong); border-radius:999px; transition:background .15s ease;}
+.switch.is-on .switch-track{background:var(--accent); border-color:var(--accent);}
+.switch-thumb{position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.35); transition:transform .15s ease;}
+.switch.is-on .switch-thumb{transform:translateX(18px);}
+.switch-icon{position:absolute; top:50%; transform:translateY(-50%); width:11px; height:11px; color:var(--text-muted); pointer-events:none; transition:color .15s ease;}
+.switch-icon.icon-sun{left:4px;}
+.switch-icon.icon-moon{right:4px;}
+.switch:not(.is-on) .switch-track .icon-sun{color:var(--text-primary);}
+.switch.is-on .switch-track .icon-moon{color:#fff;}
+.switch.is-on .switch-track .icon-sun{color:#fff;}
+.switch.theme-switch.is-on .switch-track{background:var(--surface-2); border-color:var(--border-strong);}
+.legend{display:flex; flex-wrap:wrap; gap:12px; font-size:12px; color:var(--text-secondary); margin:0 0 8px;}
+.legend .sw{display:inline-flex; align-items:center; gap:5px;}
+.legend .dot{width:9px; height:9px; border-radius:2px; display:inline-block;}
+.chartwrap{position:relative; width:100%; height:280px; margin-bottom:.75rem;}
+.sparkgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-bottom:.75rem;}
+.sparkcard{background:var(--surface-1); border-radius:6px; padding:8px 10px;}
+.sparkcard .t{font-size:11px; font-weight:600; margin:0 0 1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.sparkcard .r{font-size:10px; color:var(--text-muted); margin:0 0 4px; font-variant-numeric:tabular-nums;}
+.sparkcanvaswrap{position:relative; width:100%; height:44px;}
+.tablewrap{overflow-x:auto; border-radius:var(--radius); border:1px solid var(--border);}
+table{width:100%; border-collapse:collapse; font-size:12.5px; min-width:640px;}
+thead th{position:sticky; top:0; background:var(--surface-1); text-align:left; padding:8px 10px; color:var(--text-secondary); font-weight:600; border-bottom:1px solid var(--border-strong); white-space:nowrap;}
+tbody td{padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+.num{text-align:right; font-variant-numeric:tabular-nums;}
+.center{text-align:center;}
+.pname{color:var(--text-muted); font-size:11px;}
+#table-same-order, #table-future{table-layout:fixed;}
+#table-same-order th:nth-child(1), #table-same-order td:nth-child(1),
+#table-future th:nth-child(1), #table-future td:nth-child(1){width:32%;}
+#table-same-order th:nth-child(2), #table-same-order td:nth-child(2),
+#table-future th:nth-child(2), #table-future td:nth-child(2){width:32%;}
+#table-same-order th:nth-child(3), #table-same-order td:nth-child(3),
+#table-future th:nth-child(3), #table-future td:nth-child(3){width:18%;}
+#table-same-order th:nth-child(4), #table-same-order td:nth-child(4),
+#table-future th:nth-child(4), #table-future td:nth-child(4){width:18%;}
+#table-estoque-ref, #table-estoque-sku{table-layout:fixed;}
+#table-estoque-ref th:nth-child(1), #table-estoque-ref td:nth-child(1){width:35%;}
+#table-estoque-sku th:nth-child(1), #table-estoque-sku td:nth-child(1){width:24%;}
+#table-estoque-sku th:nth-child(2), #table-estoque-sku td:nth-child(2){width:11%;}
+#table-estoque-ref th:nth-child(2), #table-estoque-ref td:nth-child(2),
+#table-estoque-sku th:nth-child(3), #table-estoque-sku td:nth-child(3){width:13%;}
+#table-estoque-ref th:nth-child(3), #table-estoque-ref td:nth-child(3),
+#table-estoque-sku th:nth-child(4), #table-estoque-sku td:nth-child(4){width:12%;}
+#table-estoque-ref th:nth-child(4), #table-estoque-ref td:nth-child(4),
+#table-estoque-sku th:nth-child(5), #table-estoque-sku td:nth-child(5){width:13%;}
+#table-estoque-ref th:nth-child(5), #table-estoque-ref td:nth-child(5),
+#table-estoque-sku th:nth-child(6), #table-estoque-sku td:nth-child(6){width:14%;}
+#table-estoque-ref th:nth-child(6), #table-estoque-ref td:nth-child(6),
+#table-estoque-sku th:nth-child(7), #table-estoque-sku td:nth-child(7){width:13%;}
+.badge{display:inline-block; font-size:11px; font-weight:600; padding:2px 7px; border-radius:20px; font-variant-numeric:tabular-nums;}
+.badge-a{background:var(--good-bg); color:var(--good-ink);}
+.badge-b{background:var(--warn-bg); color:var(--warn-ink);}
+.badge-c{background:var(--surface-2); color:var(--text-muted); box-shadow:inset 0 0 0 1px var(--border);}
+.badge-crit{background:var(--crit-bg); color:var(--crit-ink);}
+.badge-orange{background:var(--orange-bg); color:var(--orange-ink);}
+.badge-accent{background:var(--accent-bg); color:var(--accent-ink);}
+.trend-up{color:var(--good);} .trend-down{color:var(--crit);} .trend-flat{color:var(--text-muted);}
+.status-pill{display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; padding:3px 9px; border-radius:20px;}
+.status-cheia{background:var(--good-bg); color:var(--good-ink);}
+.status-quebrada{background:var(--warn-bg); color:var(--warn-ink);}
+.status-vazio{background:var(--crit-bg); color:var(--crit-ink);}
+.dot-ok{color:var(--good);} .dot-no{color:var(--crit);}
+.tablesgrid{display:grid; grid-template-columns:1fr; gap:1.5rem;}
+@media(min-width:900px){.tablesgrid.two{grid-template-columns:1fr 1fr;}}
+.maxh{max-height:420px; overflow-y:auto;}
+.emptystate{padding:2rem; text-align:center; color:var(--text-muted); font-size:13px;}
+.footnote{font-size:11px; color:var(--text-muted); margin-top:1rem;}
+</style>
+
+<div id="sticky-wrap"></div>
+
+<div class="dr-popup" id="dr-popup">
+  <div class="dr-presets">
+    <button type="button" data-preset="month">Esse mês</button>
+    <button type="button" data-preset="7d">Últimos 7 dias</button>
+    <button type="button" data-preset="30d">Últimos 30 dias</button>
+    <button type="button" data-preset="3m">Últimos 3 meses</button>
+    <button type="button" data-preset="12m">Últimos 12 meses</button>
+  </div>
+  <div class="dr-calendars">
+    <div class="dr-cal-nav">
+      <button type="button" class="dr-nav-prev" aria-label="Mês anterior">&#8249;</button>
+      <button type="button" class="dr-nav-next" aria-label="Próximo mês">&#8250;</button>
+    </div>
+    <div class="dr-cal" id="dr-cal-0"></div>
+    <div class="dr-cal" id="dr-cal-1"></div>
+  </div>
+  <div class="dr-actions">
+    <button type="button" class="dr-cancel">Fechar</button>
+    <button type="button" class="dr-apply">Aplicar</button>
+  </div>
+</div>
+<div class="pageheader" id="pageheader">
+  <div>
+    <h1>Dashboard E-commerce</h1>
+    <p class="subtitle">Perky Shoes — dados de pedidos, estoque e descontos via API Vnda</p>
+  </div>
+  <div style="display:flex; gap:18px; align-items:center; flex-wrap:wrap;">
+    <label class="switchbar">
+      <span class="switchlabel">Fixar menu</span>
+      <span class="switch" id="pin-switch">
+        <input type="checkbox" id="pin-checkbox">
+        <span class="switch-track"></span>
+        <span class="switch-thumb"></span>
+      </span>
+    </label>
+    <label class="switchbar">
+      <span class="switchlabel">Aparência</span>
+      <span class="switch theme-switch" id="theme-switch">
+        <input type="checkbox" id="theme-checkbox" aria-label="Alternar aparência clara ou escura">
+        <span class="switch-track">
+          <svg class="switch-icon icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          <svg class="switch-icon icon-moon" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </span>
+        <span class="switch-thumb"></span>
+      </span>
+    </label>
+  </div>
+</div>
+
+<div class="tabbar" id="top-tabbar" role="tablist">
+  <button class="tabbtn" id="topbtn-padroes" role="tab" aria-selected="true" onclick="switchTopTab('padroes')">Padrões</button>
+  <button class="tabbtn" id="topbtn-produto" role="tab" aria-selected="false" onclick="switchTopTab('produto')">Produto</button>
+  <button class="tabbtn" id="topbtn-deposito" role="tab" aria-selected="false" onclick="switchTopTab('deposito')">Logística</button>
+</div>
+
+<!-- ================= TOP TAB: PADRÕES ================= -->
+<div class="panel active" id="toppanel-padroes">
+  <div class="tabbar sub" role="tablist">
+    <button class="tabbtn" id="padbtn-periodo" role="tab" aria-selected="true" onclick="switchPadroesSub('periodo')">Período</button>
+    <button class="tabbtn" id="padbtn-regiao" role="tab" aria-selected="false" onclick="switchPadroesSub('regiao')">Região</button>
+    <button class="tabbtn" id="padbtn-tamanho" role="tab" aria-selected="false" onclick="switchPadroesSub('tamanho')">Tamanho</button>
+  </div>
+
+  <div class="card">
+    <div class="filterbar">
+      <div class="field">
+        <label>Período</label>
+        <button type="button" class="dr-trigger" id="fp-daterange-btn"></button>
+        <input type="date" id="fp-start" style="display:none;">
+        <input type="date" id="fp-end" style="display:none;">
+      </div>
+      <div class="field">
+        <label for="fp-status">Status do pedido</label>
+        <select id="fp-status"><option value="all">Todos os status</option></select>
+      </div>
+      <div class="field" id="field-tamanho-categoria" style="display:none;">
+        <label for="f-categoria-tamanho">Categoria</label>
+        <select id="f-categoria-tamanho"></select>
+      </div>
+      <div class="field" id="field-tamanho-search" style="display:none;">
+        <label for="f-text-tamanho">Buscar produto</label>
+        <input type="text" id="f-text-tamanho" placeholder="ex: alpargata">
+      </div>
+      <span class="hint" id="fp-compare-hint"></span>
+    </div>
+  </div>
+
+  <div class="kpirow" id="fp-kpirow"></div>
+
+  <div class="subpanel active" id="padpanel-periodo">
+    <div class="section-title">Horas do dia</div>
+    <p class="footnote" style="margin-top:-6px;">Receita e pedidos médios por hora, considerando todos os dias do período.</p>
+    <div class="chartwrap" id="chartwrap-hour" style="height:220px;"><canvas id="chart-hour" role="img" aria-label="Receita média por horário do dia"></canvas></div>
+    <div class="tablewrap maxh"><table id="table-hour"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title">Turno do dia</div>
+    <p class="footnote" style="margin-top:-6px;">Receita e pedidos médios por turno, considerando todos os dias do período. Manhã: 6h–11h59 · Tarde: 12h–17h59 · Noite: 18h–5h59 (inclui madrugada).</p>
+    <div class="chartwrap" id="chartwrap-turno" style="height:220px;"><canvas id="chart-turno" role="img" aria-label="Receita média por turno do dia"></canvas></div>
+    <div class="tablewrap"><table id="table-turno"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title">Dias da semana</div>
+    <p class="footnote" style="margin-top:-6px;">Receita e pedidos são médias por ocorrência daquele dia da semana no período (ex: soma de todas as segundas ÷ número de segundas).</p>
+    <div class="chartwrap" id="chartwrap-weekday" style="height:220px;"><canvas id="chart-weekday" role="img" aria-label="Receita média por dia da semana"></canvas></div>
+    <div class="tablewrap maxh"><table id="table-weekday"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title">Dias do mês</div>
+    <p class="footnote" style="margin-top:-6px;">Mesma lógica de média, agrupando por número do dia (1 a 31) independente do mês.</p>
+    <div class="chartwrap" id="chartwrap-monthday" style="height:220px;"><canvas id="chart-monthday" role="img" aria-label="Receita média por dia do mês"></canvas></div>
+    <div class="tablewrap maxh"><table id="table-monthday"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title">Meses do ano</div>
+    <p class="footnote" style="margin-top:-6px;">Receita e pedidos são médias por ocorrência daquele mês no período, independente do ano (ex: soma de todos os Junhos ÷ número de Junhos, mesmo que parciais).</p>
+    <div class="chartwrap" id="chartwrap-month" style="height:220px;"><canvas id="chart-month" role="img" aria-label="Receita média por mês do ano"></canvas></div>
+    <div class="tablewrap maxh"><table id="table-month"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="padpanel-regiao">
+    <div class="section-title">Estados</div>
+    <div class="chartwrap" id="chartwrap-state" style="height:260px;"><canvas id="chart-state" role="img" aria-label="Receita total por estado"></canvas></div>
+    <div class="tablewrap maxh"><table id="table-state"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title">Cidades</div>
+    <div class="controls-row">
+      <div class="seg" id="seg-topn-city">
+        <button aria-pressed="false" data-v="10">Top 10</button>
+        <button aria-pressed="true" data-v="20">Top 20</button>
+        <button aria-pressed="false" data-v="50">Top 50</button>
+      </div>
+    </div>
+    <div class="chartwrap" id="chartwrap-city" style="height:400px;"><canvas id="chart-city" role="img" aria-label="Receita total por cidade"></canvas></div>
+    <div class="tablewrap maxh"><table id="table-city"><thead></thead><tbody></tbody></table></div>
+
+    <p class="footnote" id="padroes-address-note"></p>
+  </div>
+
+  <div class="subpanel" id="padpanel-tamanho">
+    <div class="section-title">Vendas por tamanho</div>
+    <p class="footnote" style="margin-top:-6px;">Considera apenas tamanhos numéricos de calçado (33 a 44); acessórios e itens sem tamanho não entram nessa análise.</p>
+    <p class="footnote" id="tamanho-summary"></p>
+    <div class="chartwrap" id="chartwrap-tamanho" style="height:280px;"><canvas id="chart-tamanho" role="img" aria-label="Receita e quantidade vendida por tamanho"></canvas></div>
+    <div class="tablewrap maxh"><table id="table-tamanho"><thead></thead><tbody></tbody></table></div>
+  </div>
+</div>
+
+<!-- ================= TOP TAB: PRODUTO ================= -->
+<div class="panel" id="toppanel-produto">
+  <div class="tabbar sub" role="tablist">
+    <button class="tabbtn" id="tabbtn-abc" role="tab" aria-selected="true" onclick="switchTab('abc')">Curva ABC</button>
+    <button class="tabbtn" id="tabbtn-estoque" role="tab" aria-selected="false" onclick="switchTab('estoque')">Estoque por dia</button>
+    <button class="tabbtn" id="tabbtn-desconto" role="tab" aria-selected="false" onclick="switchTab('desconto')">Descontos por dia</button>
+    <button class="tabbtn" id="tabbtn-crosssell" role="tab" aria-selected="false" onclick="switchTab('crosssell')">Venda Cruzada</button>
+    <button class="tabbtn" id="tabbtn-avise-me" role="tab" aria-selected="false" onclick="switchTab('avise-me')">Demanda Reprimida</button>
+    <button class="tabbtn" id="tabbtn-reposicoes" role="tab" aria-selected="false" onclick="switchTab('reposicoes')">Reposições</button>
+    <button class="tabbtn" id="tabbtn-compras" role="tab" aria-selected="false" onclick="switchTab('compras')">Compras</button>
+  </div>
+
+<!-- ================= TAB 1: CURVA ABC ================= -->
+<div class="panel active" id="panel-abc">
+  <div class="card">
+    <div class="filterbar">
+      <div class="field">
+        <label>Período</label>
+        <button type="button" class="dr-trigger" id="f-daterange-btn"></button>
+        <input type="date" id="f-start" style="display:none;">
+        <input type="date" id="f-end" style="display:none;">
+      </div>
+      <div class="field">
+        <label for="f-status">Status do pedido</label>
+        <select id="f-status"><option value="all">Todos os status</option></select>
+      </div>
+      <div class="field">
+        <label for="f-categoria-abc">Categoria</label>
+        <select id="f-categoria-abc"></select>
+      </div>
+      <div class="field">
+        <label for="f-text-abc">Buscar produto</label>
+        <input type="text" id="f-text-abc" placeholder="ex: alpargata">
+      </div>
+      <span class="hint" id="f-compare-hint"></span>
+    </div>
+  </div>
+
+  <div class="kpirow" id="kpirow"></div>
+
+  <div class="section-title">Ranking por receita</div>
+  <div class="controls-row">
+    <div class="seg" id="seg-gran-receita">
+      <button aria-pressed="true" data-v="day">Dia</button>
+      <button aria-pressed="false" data-v="week">Semana</button>
+      <button aria-pressed="false" data-v="month">Mês</button>
+    </div>
+    <div class="seg" id="seg-topn-receita">
+      <button aria-pressed="true" data-v="5">Top 5</button>
+      <button aria-pressed="false" data-v="10">Top 10</button>
+      <button aria-pressed="false" data-v="15">Top 15</button>
+      <button aria-pressed="false" data-v="20">Top 20</button>
+    </div>
+  </div>
+  <div class="legend" id="legend-receita"></div>
+  <div class="chartwrap" id="chartwrap-receita"><canvas id="chart-receita" role="img" aria-label="Evolução de receita dos produtos mais vendidos"></canvas></div>
+  <div class="emptystate" id="chart-fallback-receita" style="display:none;">Não foi possível carregar o gráfico (biblioteca de gráficos indisponível). As tabelas abaixo continuam funcionando normalmente.</div>
+  <div class="sparkgrid" id="sparkgrid-receita" style="display:none;"></div>
+  <div class="tablewrap maxh"><table id="table-receita"><thead></thead><tbody></tbody></table></div>
+
+  <div class="section-title">Ranking por quantidade</div>
+  <div class="controls-row">
+    <div class="seg" id="seg-gran-qtd">
+      <button aria-pressed="true" data-v="day">Dia</button>
+      <button aria-pressed="false" data-v="week">Semana</button>
+      <button aria-pressed="false" data-v="month">Mês</button>
+    </div>
+    <div class="seg" id="seg-topn-qtd">
+      <button aria-pressed="true" data-v="5">Top 5</button>
+      <button aria-pressed="false" data-v="10">Top 10</button>
+      <button aria-pressed="false" data-v="15">Top 15</button>
+      <button aria-pressed="false" data-v="20">Top 20</button>
+    </div>
+  </div>
+  <div class="legend" id="legend-qtd"></div>
+  <div class="chartwrap" id="chartwrap-qtd"><canvas id="chart-qtd" role="img" aria-label="Evolução de quantidade vendida dos produtos mais vendidos"></canvas></div>
+  <div class="emptystate" id="chart-fallback-qtd" style="display:none;">Não foi possível carregar o gráfico (biblioteca de gráficos indisponível). As tabelas abaixo continuam funcionando normalmente.</div>
+  <div class="sparkgrid" id="sparkgrid-qtd" style="display:none;"></div>
+  <div class="tablewrap maxh"><table id="table-qtd"><thead></thead><tbody></tbody></table></div>
+
+  <p class="footnote">Classe A = até 80% da receita/quantidade acumulada · B = até 95% · C = restante. Tendência compara com o período anterior de mesma duração.</p>
+</div>
+
+<!-- ================= TAB 2: ESTOQUE POR DIA ================= -->
+<div class="panel" id="panel-estoque">
+  <div class="card">
+    <div class="filterbar">
+      <div class="field">
+        <label for="f-dia-estoque">Dia</label>
+        <select id="f-dia-estoque"></select>
+      </div>
+      <div class="field">
+        <label for="f-categoria-estoque">Categoria</label>
+        <select id="f-categoria-estoque"></select>
+      </div>
+      <div class="field">
+        <label for="f-text-estoque">Buscar produto</label>
+        <input type="text" id="f-text-estoque" placeholder="ex: alpargata">
+      </div>
+      <span class="hint" id="estoque-compare-hint"></span>
+    </div>
+  </div>
+
+  <div class="kpirow" id="estoque-kpirow"></div>
+
+  <div class="section-title">Por referência</div>
+  <div class="controls-row">
+    <div class="field">
+      <label for="f-grade">Grade</label>
+      <select id="f-grade">
+        <option value="all">Todas</option>
+        <option value="cheia">Grade cheia</option>
+        <option value="quebrada">Grade quebrada</option>
+        <option value="vazio">Sem estoque</option>
+      </select>
+    </div>
+  </div>
+  <div class="tablewrap maxh"><table id="table-estoque-ref"><thead></thead><tbody></tbody></table></div>
+
+  <div class="section-title">Por SKU</div>
+  <div class="controls-row">
+    <div class="field">
+      <label for="f-disponibilidade">Disponibilidade</label>
+      <select id="f-disponibilidade">
+        <option value="all">Todas</option>
+        <option value="disponivel">Disponível</option>
+        <option value="indisponivel">Indisponível</option>
+      </select>
+    </div>
+  </div>
+  <div class="tablewrap maxh"><table id="table-estoque-sku"><thead></thead><tbody></tbody></table></div>
+</div>
+
+<!-- ================= TAB 3: DESCONTOS POR DIA ================= -->
+<div class="panel" id="panel-desconto">
+  <div class="card">
+    <div class="filterbar">
+      <div class="field">
+        <label for="f-dia-desconto">Dia</label>
+        <select id="f-dia-desconto"></select>
+      </div>
+      <div class="field">
+        <label for="f-status-desconto">Status</label>
+        <select id="f-status-desconto">
+          <option value="all">Todos</option>
+          <option value="promo">Em promoção</option>
+          <option value="cheio">Preço cheio</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-desconto-valor">Desconto</label>
+        <select id="f-desconto-valor"><option value="all">Todos</option></select>
+      </div>
+      <div class="field">
+        <label for="f-categoria-desconto">Categoria</label>
+        <select id="f-categoria-desconto"></select>
+      </div>
+      <div class="field">
+        <label for="f-text-desconto">Buscar produto</label>
+        <input type="text" id="f-text-desconto" placeholder="ex: alpargata">
+      </div>
+      <span class="hint" id="desconto-compare-hint"></span>
+    </div>
+  </div>
+  <div class="kpirow" id="desconto-kpirow"></div>
+  <div class="tablewrap maxh"><table id="table-desconto"><thead></thead><tbody></tbody></table></div>
+</div>
+
+<!-- ================= TAB 4: VENDA CRUZADA ================= -->
+<div class="panel" id="panel-crosssell">
+  <div class="card">
+    <div class="filterbar">
+      <div class="field">
+        <label for="f-periodo-cross">Período</label>
+        <select id="f-periodo-cross">
+          <option value="todo">Todo período</option>
+          <option value="y12">Últimos 12 meses</option>
+          <option value="m3">Últimos 3 meses</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-minsup-cross">Frequência mínima
+          <span class="infotip" tabindex="0" role="img" aria-label="Quantidade mínima de ocorrências pra um item aparecer: pedidos em comum na tabela de mesmo pedido, clientes na de compras futuras, amostras na de tempo de recompra.">i<span class="tooltip-box">Quantidade mínima de ocorrências pra um item aparecer: <b>pedidos em comum</b> na tabela de mesmo pedido, <b>clientes</b> na de compras futuras, <b>amostras</b> na de tempo de recompra.</span></span>
+        </label>
+        <select id="f-minsup-cross">
+          <option value="1">1+</option>
+          <option value="2" selected>2+</option>
+          <option value="3">3+</option>
+          <option value="5">5+</option>
+          <option value="10">10+</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-categoria-cross">Categoria</label>
+        <select id="f-categoria-cross"></select>
+      </div>
+      <div class="field">
+        <label for="f-text-cross">Buscar produto</label>
+        <input type="text" id="f-text-cross" placeholder="ex: alpargata">
+      </div>
+      <span class="hint" id="cross-compare-hint"></span>
+    </div>
+  </div>
+
+  <div class="kpirow" id="cross-kpirow"></div>
+
+  <div class="section-title">Comprado junto no mesmo pedido</div>
+  <p class="footnote" style="margin-top:-6px;">Pares de produtos que apareceram no mesmo pedido, dos mais frequentes para os menos frequentes. % é sobre o total de pedidos de cada produto isoladamente.</p>
+  <div class="tablewrap maxh"><table id="table-same-order"><thead></thead><tbody></tbody></table></div>
+
+  <div class="section-title">Comprado em pedidos futuros</div>
+  <p class="footnote" style="margin-top:-6px;">Produtos que o mesmo cliente (identificado por e-mail) comprou em um pedido posterior a outro. % é sobre o total de clientes que compraram o produto base.</p>
+  <div class="tablewrap maxh"><table id="table-future"><thead></thead><tbody></tbody></table></div>
+
+  <div class="section-title">Tempo médio até a próxima compra</div>
+  <p class="footnote" style="margin-top:-6px;">Média de dias entre um pedido com esse produto e o pedido seguinte do mesmo cliente (qualquer produto).</p>
+  <div class="tablewrap maxh"><table id="table-repurchase"><thead></thead><tbody></tbody></table></div>
+</div>
+
+<!-- ================= TAB 5: AVISE-ME ================= -->
+<div class="panel" id="panel-avise-me">
+  <div class="card">
+    <div class="filterbar">
+      <div class="field">
+        <label>Período</label>
+        <button type="button" class="dr-trigger" id="am-daterange-btn"></button>
+        <input type="date" id="am-start" style="display:none;">
+        <input type="date" id="am-end" style="display:none;">
+      </div>
+      <div class="field">
+        <label for="f-reabastecido-avise-me">Com estoque
+          <span class="infotip" tabindex="0" role="img" aria-label="Se o produto tem estoque disponível agora, independente de o cliente ter comprado.">i<span class="tooltip-box">Se o produto tem estoque disponível agora, independente de o cliente ter comprado.</span></span>
+        </label>
+        <select id="f-reabastecido-avise-me">
+          <option value="all">Todos</option>
+          <option value="sim">Sim</option>
+          <option value="nao">Não</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-atendido-avise-me">Atendido
+          <span class="infotip" tabindex="0" role="img" aria-label="O cliente comprou esse mesmo tamanho (SKU) depois do aviso.">i<span class="tooltip-box">O cliente comprou esse mesmo tamanho (SKU) depois do aviso.</span></span>
+        </label>
+        <select id="f-atendido-avise-me">
+          <option value="all">Todos</option>
+          <option value="sim">Sim</option>
+          <option value="nao">Não</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-categoria-avise-me">Categoria</label>
+        <select id="f-categoria-avise-me"></select>
+      </div>
+      <div class="field">
+        <label for="f-text-avise-me">Buscar produto</label>
+        <input type="text" id="f-text-avise-me" placeholder="ex: alpargata">
+      </div>
+      <span class="hint" id="am-compare-hint"></span>
+    </div>
+  </div>
+  <div class="kpirow" id="avise-me-kpirow"></div>
+  <div class="section-title-row">
+    <div class="section-title">Todos os registros</div>
+    <button type="button" class="pii-toggle" id="pii-toggle-btn" aria-label="Mostrar e-mail e telefone completos" title="Mostrar e-mail e telefone completos">
+      <svg class="icon-eye-closed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.86 21.86 0 0 1 5.06-6.06M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a21.86 21.86 0 0 1-3.22 4.56M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      <svg class="icon-eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+    </button>
+    <div class="pii-popover" id="pii-popover">
+      <input type="password" id="pii-password-input" placeholder="Senha de acesso" autocomplete="off">
+      <button type="button" class="pii-popover-btn" id="pii-password-submit">Confirmar</button>
+      <span class="pii-popover-error" id="pii-password-error"></span>
+    </div>
+  </div>
+  <div class="tablewrap maxh"><table id="table-avise-me"><thead></thead><tbody></tbody></table></div>
+
+  <div class="section-title">Ranking por produto</div>
+  <p class="footnote" style="margin-top:-6px;">Agrupado por produto, considerando os mesmos filtros acima. Ordenado por pedidos de aviso, do maior para o menor.</p>
+  <div class="tablewrap maxh"><table id="table-avise-me-ranking"><thead></thead><tbody></tbody></table></div>
+</div>
+
+<!-- ================= TAB 6: REPOSICOES ================= -->
+<div class="panel" id="panel-reposicoes">
+  <div class="card">
+    <div class="filterbar">
+      <div class="field">
+        <label for="f-status-reposicoes">Status
+          <span class="infotip" tabindex="0" role="img" aria-label="Atrasado: a data prevista já passou. Em breve: chega nos próximos 7 dias. No prazo: chega depois disso. Filtra as duas tabelas abaixo.">i<span class="tooltip-box">Atrasado: a data prevista já passou. Em breve: chega nos próximos 7 dias. No prazo: chega depois disso. Filtra as duas tabelas abaixo.</span></span>
+        </label>
+        <select id="f-status-reposicoes">
+          <option value="all">Todos</option>
+          <option value="atrasado">Atrasado</option>
+          <option value="breve">Em breve</option>
+          <option value="prazo">No prazo</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-estoque-reposicoes">Estoque atual</label>
+        <select id="f-estoque-reposicoes">
+          <option value="all">Todos</option>
+          <option value="zero">Sem estoque</option>
+          <option value="com">Com estoque</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-categoria-reposicoes">Categoria</label>
+        <select id="f-categoria-reposicoes"></select>
+      </div>
+      <div class="field">
+        <label for="f-text-reposicoes">Buscar produto</label>
+        <input type="text" id="f-text-reposicoes" placeholder="ex: alpargata">
+      </div>
+      <span class="hint" id="reposicoes-compare-hint"></span>
+    </div>
+  </div>
+  <div class="kpirow" id="reposicoes-kpirow"></div>
+  <div class="section-title">Pedidos de reposição em aberto</div>
+  <p class="footnote" style="margin-top:-6px;">SKUs com pedido de reposição já feito ao fornecedor, ordenados pela data de entrega prevista. Dados vêm da planilha de calendário de reposições.</p>
+  <div class="tablewrap maxh"><table id="table-reposicoes"><thead></thead><tbody></tbody></table></div>
+
+  <div class="section-title">Vendas antecipadas</div>
+  <p class="footnote" style="margin-top:-6px;" id="presale-summary"></p>
+  <div class="tablewrap maxh"><table id="table-presale"><thead></thead><tbody></tbody></table></div>
+</div>
+
+<!-- ================= TAB 7: COMPRAS ================= -->
+<div class="panel" id="panel-compras">
+  <div class="card">
+    <div class="filterbar">
+      <div class="field">
+        <label for="f-leadtime-compras">Lead time
+          <span class="infotip" tabindex="0" role="img" aria-label="Em dias. Quantos dias o fornecedor leva para entregar depois do pedido feito.">i<span class="tooltip-box">Em dias. Quantos dias o fornecedor leva para entregar depois do pedido feito.</span></span>
+        </label>
+        <input type="number" id="f-leadtime-compras" min="0" value="40">
+      </div>
+      <div class="field">
+        <label for="f-cobertura-compras">Cobertura-alvo
+          <span class="infotip" tabindex="0" role="img" aria-label="Em dias. Quanto estoque, além do lead time, você quer manter como margem de segurança.">i<span class="tooltip-box">Em dias. Quanto estoque, além do lead time, você quer manter como margem de segurança.</span></span>
+        </label>
+        <input type="number" id="f-cobertura-compras" min="0" value="30">
+      </div>
+      <div class="field">
+        <label for="f-moq-compras">Pedido mínimo
+          <span class="infotip" tabindex="0" role="img" aria-label="Quantidade mínima por produto que o fornecedor aceita no pedido, somando todas as variações (tamanhos, cores etc). Só é aplicado se a necessidade calculada já for pelo menos 30% desse mínimo — senão o produto não entra na lista de compra.">i<span class="tooltip-box">Quantidade mínima por produto que o fornecedor aceita no pedido, somando todas as variações (tamanhos, cores etc). Só é aplicado se a necessidade calculada já for pelo menos 30% desse mínimo — senão o produto não entra na lista de compra.</span></span>
+        </label>
+        <input type="number" id="f-moq-compras" min="0" value="10">
+      </div>
+      <div class="field">
+        <label for="f-janela-compras">Janela de vendas
+          <span class="infotip" tabindex="0" role="img" aria-label="Em dias. Período de histórico de vendas usado para calcular a taxa diária média de cada SKU.">i<span class="tooltip-box">Em dias. Período de histórico de vendas usado para calcular a taxa diária média de cada SKU.</span></span>
+        </label>
+        <input type="number" id="f-janela-compras" min="1" value="90">
+      </div>
+      <div class="field">
+        <label for="f-categoria-compras">Categoria</label>
+        <select id="f-categoria-compras"><option value="all">Todas</option></select>
+      </div>
+      <div class="field">
+        <label for="f-text-compras">Buscar produto</label>
+        <input type="text" id="f-text-compras" placeholder="ex: sandália">
+      </div>
+      <span class="hint" id="compras-compare-hint"></span>
+    </div>
+  </div>
+  <div class="kpirow" id="compras-kpirow"></div>
+  <div class="section-title">Necessidade de compra por SKU</div>
+  <p class="footnote" style="margin-top:-6px;">Considera produtos ativos com grade numérica 33-44 (calçado) ou tamanho único (acessórios), filtrados pela busca acima — grades não numéricas (chinelos em par, calçado infantil) ainda não entram nessa conta. A demanda usada no cálculo soma vendas realizadas + avisos de demanda reprimida ainda não atendidos no período (venda perdida por ruptura de estoque). Necessidade = demanda projetada para o período (lead time + cobertura) − estoque atual − reposição já em pedido, distribuída pela curva de tamanhos quando o produto tem grade, e respeitando o pedido mínimo por produto.</p>
+  <div class="tablewrap maxh"><table id="table-compras-sku"><thead></thead><tbody></tbody></table></div>
+</div>
+</div>
+
+<!-- ================= TOP TAB: DEPÓSITO ================= -->
+<div class="panel" id="toppanel-deposito">
+  <div class="tabbar sub" role="tablist">
+    <button class="tabbtn" id="depbtn-prateleiras" role="tab" aria-selected="true" onclick="switchDepositoSub('prateleiras')">Depósito</button>
+    <button class="tabbtn" id="depbtn-expedicao" role="tab" aria-selected="false" onclick="switchDepositoSub('expedicao')">Expedição</button>
+  </div>
+
+  <div class="subpanel active" id="deppanel-prateleiras">
+    <p class="footnote" style="margin-top:-6px;">Organização física do estoque no galpão: estoque do site descontando o que está em pré-venda (ainda não chegou fisicamente). 33 estantes, 5 andares cada, 3 tamanhos de caixa por categoria de calçado. Feirinha e bolsas/acessórios ficam em 3 estantes à parte, fora deste cálculo.</p>
+
+    <div class="section-title">Capacidade</div>
+    <div class="capacidade-layout">
+      <div class="capacidade-esquerda">
+        <div class="kpirow" id="deposito-kpirow"></div>
+        <div class="meters-grid" id="deposito-meters"></div>
+      </div>
+      <div class="capacidade-ilustracao">
+        <img id="deposito-ilustracao" alt="Ilustração do nível de ocupação do depósito">
+        <p class="capacidade-ilustracao-label" id="deposito-ilustracao-label"></p>
+      </div>
+    </div>
+
+    <div class="section-title">Projeção de Ocupação</div>
+    <p class="footnote" style="margin-top:-6px;">Estimativa pras próximas 4 semanas, considerando a velocidade de venda dos últimos 60 dias por categoria e as reposições já mapeadas (com data prevista de chegada).</p>
+    <div class="projecao-grid" id="deposito-projecao"></div>
+
+    <div class="section-title">Mapa de Depósito</div>
+    <p class="footnote" style="margin-top:-6px;">Clique numa estante pra ver os andares dela; clique num andar pra ver os produtos guardados ali. 33 estantes dedicadas a calçado + 3 reservadas pra Feirinha/acessórios.</p>
+    <div class="wh-legend" id="deposito-legend"></div>
+    <div class="wh-drilldown">
+      <div class="wh-col">
+        <div class="wh-col-title">Estantes</div>
+        <div class="warehouse-map" id="deposito-mapa-visual"></div>
+      </div>
+      <div class="wh-col">
+        <div class="wh-col-title" id="wh-estante-titulo">Selecione uma estante</div>
+        <div id="deposito-andares-visual"><div class="wh-empty-hint">Clique numa estante no mapa à esquerda.</div></div>
+      </div>
+      <div class="wh-col">
+        <div class="wh-col-title" id="wh-andar-titulo">Selecione um andar</div>
+        <div class="tablewrap maxh"><table id="table-deposito-skus"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Localizador por SKU</div>
+    <p class="footnote" style="margin-top:-6px;">Todos os SKUs com estoque físico e onde cada um está guardado — incluindo os que não couberam em nenhuma estante ("Sem espaço").</p>
+    <div class="filterbar" style="margin-bottom:10px;">
+      <div class="field">
+        <label for="f-categoria-localizador">Categoria</label>
+        <select id="f-categoria-localizador"></select>
+      </div>
+      <div class="field">
+        <label for="f-text-localizador">Buscar produto</label>
+        <input type="text" id="f-text-localizador" placeholder="ex: alpargata">
+      </div>
+    </div>
+    <div class="tablewrap maxh"><table id="table-deposito-localizador"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title">Saúde do Estoque por Produto</div>
+    <p class="footnote" style="margin-top:-6px;">Cruza estoque físico, velocidade de venda (60 dias) e reposições já mapeadas pra classificar cada referência: risco de ruptura, saudável, atenção ou parado.</p>
+    <div class="wh-legend" style="margin-bottom:.75rem;">
+      <span class="wh-legend-item"><span class="wh-legend-swatch" style="background:var(--orange)"></span>Risco de ruptura (cobertura &lt; 30 dias)</span>
+      <span class="wh-legend-item"><span class="wh-legend-swatch" style="background:var(--good)"></span>Saudável (30-90 dias de cobertura)</span>
+      <span class="wh-legend-item"><span class="wh-legend-swatch" style="background:var(--warn)"></span>Atenção (90-150 dias de cobertura)</span>
+      <span class="wh-legend-item"><span class="wh-legend-swatch" style="background:var(--crit)"></span>Parado (sem giro ou &gt;150 dias de cobertura)</span>
+    </div>
+    <div class="filterbar" style="margin-bottom:10px;">
+      <div class="field">
+        <label for="f-categoria-deposito">Categoria</label>
+        <select id="f-categoria-deposito"></select>
+      </div>
+      <div class="field">
+        <label for="f-text-deposito">Buscar produto</label>
+        <input type="text" id="f-text-deposito" placeholder="ex: alpargata">
+      </div>
+    </div>
+    <p class="footnote" style="margin-top:-2px;">À esquerda, os 15 produtos que mais ocupam espaço hoje. À direita, quanto do depósito cada classificação ocupa no total — o bloco "Parado" sozinho já mostra o tamanho do problema.</p>
+    <div class="saude-layout">
+      <div class="saude-left">
+        <div class="saude-donut-wrap"><canvas id="chart-deposito-top15" role="img" aria-label="Rosca com os 15 produtos que mais ocupam espaço no depósito, coloridos pela classificação de saúde do estoque"></canvas></div>
+        <div class="saude-legend" id="deposito-top15-legend"></div>
+      </div>
+      <div class="saude-kpis" id="deposito-saude-kpis"></div>
+      <div class="saude-blocos-col" id="deposito-blocos-classe"></div>
+    </div>
+
+    <div class="tablewrap maxh"><table id="table-deposito-ranking"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="deppanel-expedicao">
+    <p class="footnote" style="margin-top:-6px;" id="expedicao-janela-footnote"></p>
+
+    <div class="section-title">Fluxo do pedido</div>
+    <p class="footnote" style="margin-top:-6px;" id="expedicao-fluxo-footnote"></p>
+    <div class="exp-flow" id="expedicao-fluxo"></div>
+    <div class="exp-branch" id="expedicao-cancelados"></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Resumo</div>
+    <div class="kpirow" id="expedicao-kpirow"></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Pedidos</div>
+    <p class="footnote" style="margin-top:-6px;">Todos os pedidos dos últimos <span id="expedicao-janela-dias"></span> dias e o estágio atual de cada um.</p>
+    <div class="filterbar" style="margin-bottom:10px;">
+      <div class="field">
+        <label for="f-estagio-expedicao">Status</label>
+        <select id="f-estagio-expedicao">
+          <option value="all">Todos</option>
+          <option value="recebido">Recebido</option>
+          <option value="confirmado">Confirmado</option>
+          <option value="integrado_tiny">Integrado no Tiny</option>
+          <option value="nf_gerada">NF gerada</option>
+          <option value="separado">Separado p/ envio</option>
+          <option value="enviado">Enviado</option>
+          <option value="entregue">Entregue</option>
+          <option value="cancelado">Cancelado</option>
+          <option value="nao_entregue">Não entregue</option>
+          <option value="atrasado">Atrasados</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-text-expedicao">Buscar pedido</label>
+        <input type="text" id="f-text-expedicao" placeholder="código ou e-mail">
+      </div>
+    </div>
+    <div class="tablewrap maxh"><table id="table-expedicao-pedidos"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Prazo por transportadora</div>
+    <p class="footnote" style="margin-top:-6px;">Tempo médio entre a confirmação do pedido e a entrega, por transportadora.</p>
+    <div class="tablewrap"><table id="table-expedicao-transportadora"><thead></thead><tbody></tbody></table></div>
+  </div>
+</div>
+
+<script>
+/*__CHARTJS__*/
+</script>
+<script>
+const DATA = /*__DATA__*/;
+const DEPOSITO_ILUSTRACOES = /*__DEPOSITO_IMGS__*/;
+
+/* categoria real da VNDA (Alpargatas/Botas/Sandalias etc.) por referencia, usada como
+   filtro em varias abas - vem do snapshot de estoque, que ja traz essa categoria. */
+const categoriaPorReferencia = {};
+(DATA.stock_sku||[]).forEach(r=>{ if(r.categoria) categoriaPorReferencia[r.referencia] = r.categoria; });
+const CATEGORIAS_DISPONIVEIS = Array.from(new Set(Object.values(categoriaPorReferencia))).sort((a,b)=>a.localeCompare(b));
+function populaCategoriaSelect(sel){
+  sel.innerHTML = '<option value="all">Todas</option>' + CATEGORIAS_DISPONIVEIS.map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+function matchCategoria(sel, referencia){
+  return sel.value==='all' || categoriaPorReferencia[referencia]===sel.value;
+}
+
+function switchTopTab(name){
+  ['padroes','produto','deposito'].forEach(n=>{
+    document.getElementById('toppanel-'+n).classList.toggle('active', n===name);
+    document.getElementById('topbtn-'+n).setAttribute('aria-selected', n===name);
+  });
+  if(name==='deposito'){ safeRun(renderDepositoSaudeCharts, 'gráfico do Depósito'); safeRun(renderExpedicao, 'painel de Expedição'); }
+  syncDynamicSticky();
+}
+
+function switchTab(name){
+  ['abc','estoque','desconto','crosssell','avise-me','reposicoes','compras'].forEach(n=>{
+    document.getElementById('panel-'+n).classList.toggle('active', n===name);
+    document.getElementById('tabbtn-'+n).setAttribute('aria-selected', n===name);
+  });
+  syncDynamicSticky();
+}
+
+function switchPadroesSub(name){
+  ['periodo','regiao','tamanho'].forEach(n=>{
+    document.getElementById('padpanel-'+n).classList.toggle('active', n===name);
+    document.getElementById('padbtn-'+n).setAttribute('aria-selected', n===name);
+  });
+  document.getElementById('field-tamanho-search').style.display = name==='tamanho' ? '' : 'none';
+  document.getElementById('field-tamanho-categoria').style.display = name==='tamanho' ? '' : 'none';
+  syncDynamicSticky();
+}
+
+function switchDepositoSub(name){
+  ['prateleiras','expedicao'].forEach(n=>{
+    document.getElementById('deppanel-'+n).classList.toggle('active', n===name);
+    document.getElementById('depbtn-'+n).setAttribute('aria-selected', n===name);
+  });
+  syncDynamicSticky();
+}
+
+const fmtBRL = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0});
+const fmtInt = new Intl.NumberFormat('pt-BR');
+const fmtPct = (v) => (v>=0?'+':'') + v.toFixed(1).replace('.', ',') + '%';
+const fmtPctPlain = (v) => v.toFixed(1).replace('.', ',') + '%';
+
+function addDays(dateStr, n){
+  const d = new Date(dateStr+'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate()+n);
+  return d.toISOString().slice(0,10);
+}
+function todayISO(){
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function dayDiff(a,b){
+  return Math.round((new Date(b+'T00:00:00Z') - new Date(a+'T00:00:00Z'))/86400000);
+}
+/* Texto "Comparando com X a Y (Z dias)": periodo anterior de mesma duracao. */
+function comparePeriodText(start, end){
+  const dur = dayDiff(start,end)+1;
+  const prevEnd = addDays(start,-1);
+  const prevStart = addDays(prevEnd, -(dur-1));
+  return `Comparando com ${prevStart} a ${prevEnd} (${dur} dias)`;
+}
+function isoWeekStart(dateStr){
+  const d = new Date(dateStr+'T00:00:00Z');
+  const day = (d.getUTCDay()+6)%7;
+  d.setUTCDate(d.getUTCDate()-day);
+  return d.toISOString().slice(0,10);
+}
+function monthKey(dateStr){ return dateStr.slice(0,7); }
+
+/* ---------------- SELETOR DE PERIODO (campo unico + calendario duplo) ---------------- */
+
+const initDateRangePicker = (function(){
+  const popup = document.getElementById('dr-popup');
+  const cal0 = document.getElementById('dr-cal-0');
+  const cal1 = document.getElementById('dr-cal-1');
+  const presetBtns = Array.from(popup.querySelectorAll('.dr-presets button'));
+  const btnCancel = popup.querySelector('.dr-cancel');
+  const btnApply = popup.querySelector('.dr-apply');
+  const btnPrev = popup.querySelector('.dr-nav-prev');
+  const btnNext = popup.querySelector('.dr-nav-next');
+
+  const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const DOW = ['D','S','T','Q','Q','S','S'];
+
+  let activeCtx = null;
+  let viewYear, viewMonth;
+  let pendingStart = null, pendingEnd = null;
+  let pickingSecond = false;
+
+  function fmtBRdate(iso){ return iso ? iso.split('-').reverse().join('/') : ''; }
+
+  function updateTriggerLabel(ctx){
+    ctx.triggerBtn.textContent = `${fmtBRdate(ctx.startInput.value)} - ${fmtBRdate(ctx.endInput.value)}`;
+  }
+
+  function applyRangeClasses(cell, iso){
+    if(!pendingStart) return;
+    const end = pendingEnd || pendingStart;
+    const lo = pendingStart < end ? pendingStart : end;
+    const hi = pendingStart < end ? end : pendingStart;
+    if(iso < lo || iso > hi) return;
+    if(lo===hi && iso===lo){ cell.classList.add('dr-range-single'); return; }
+    if(iso===lo){ cell.classList.add('dr-range-start'); return; }
+    if(iso===hi){ cell.classList.add('dr-range-end'); return; }
+    cell.classList.add('dr-in-range');
+  }
+
+  function buildMonthGrid(container, year, month, minD, maxD){
+    container.innerHTML = '';
+    const head = document.createElement('div');
+    head.className = 'dr-cal-head';
+    head.textContent = MONTH_NAMES[month] + ' de ' + year;
+    container.appendChild(head);
+    const grid = document.createElement('div');
+    grid.className = 'dr-cal-grid';
+    DOW.forEach(d=>{
+      const el = document.createElement('div');
+      el.className = 'dr-cal-dow';
+      el.textContent = d;
+      grid.appendChild(el);
+    });
+    const firstDay = new Date(Date.UTC(year, month, 1));
+    const startOffset = firstDay.getUTCDay();
+    const daysInMonth = new Date(Date.UTC(year, month+1, 0)).getUTCDate();
+    for(let i=0;i<startOffset;i++) grid.appendChild(document.createElement('div'));
+    for(let d=1; d<=daysInMonth; d++){
+      const iso = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const cell = document.createElement('div');
+      cell.className = 'dr-cal-day';
+      cell.textContent = d;
+      cell.dataset.date = iso;
+      if((minD && iso<minD) || (maxD && iso>maxD)) cell.classList.add('dr-disabled');
+      applyRangeClasses(cell, iso);
+      grid.appendChild(cell);
+    }
+    container.appendChild(grid);
+  }
+
+  function renderCalendars(){
+    if(!activeCtx) return;
+    buildMonthGrid(cal0, viewYear, viewMonth, activeCtx.minDate, activeCtx.maxDate);
+    let nextY = viewYear, nextM = viewMonth+1;
+    if(nextM>11){ nextM=0; nextY++; }
+    buildMonthGrid(cal1, nextY, nextM, activeCtx.minDate, activeCtx.maxDate);
+  }
+
+  function positionPopup(){
+    const r = activeCtx.triggerBtn.getBoundingClientRect();
+    popup.style.left = '0px'; popup.style.top = '0px';
+    const pr = popup.getBoundingClientRect();
+    let left = Math.max(8, Math.min(r.left, window.innerWidth - pr.width - 8));
+    let top = r.bottom + 6;
+    if(top + pr.height > window.innerHeight - 8) top = Math.max(8, r.top - pr.height - 6);
+    popup.style.left = left + 'px';
+    popup.style.top = top + 'px';
+  }
+
+  function openPicker(ctx){
+    if(activeCtx && activeCtx!==ctx) closePicker();
+    activeCtx = ctx;
+    pendingStart = ctx.startInput.value;
+    pendingEnd = ctx.endInput.value;
+    pickingSecond = false;
+    const base = pendingStart || ctx.maxDate || todayISO();
+    const d = new Date(base+'T00:00:00Z');
+    viewYear = d.getUTCFullYear(); viewMonth = d.getUTCMonth();
+    popup.style.visibility = 'hidden';
+    popup.style.display = 'block';
+    renderCalendars();
+    positionPopup();
+    popup.style.visibility = '';
+  }
+
+  function closePicker(){
+    popup.style.display = 'none';
+    activeCtx = null;
+  }
+
+  function applyPicker(){
+    if(!activeCtx || !pendingStart){ closePicker(); return; }
+    const end = pendingEnd || pendingStart;
+    const lo = pendingStart < end ? pendingStart : end;
+    const hi = pendingStart < end ? end : pendingStart;
+    activeCtx.startInput.value = lo;
+    activeCtx.endInput.value = hi;
+    updateTriggerLabel(activeCtx);
+    activeCtx.startInput.dispatchEvent(new Event('change', {bubbles:true}));
+    closePicker();
+  }
+
+  function onDayClick(e){
+    const cell = e.target.closest('.dr-cal-day');
+    if(!cell || cell.classList.contains('dr-disabled') || !cell.dataset.date) return;
+    const iso = cell.dataset.date;
+    if(!pickingSecond){
+      pendingStart = iso; pendingEnd = null; pickingSecond = true;
+    } else {
+      pendingEnd = iso; pickingSecond = false;
+    }
+    renderCalendars();
+  }
+  cal0.addEventListener('click', onDayClick);
+  cal1.addEventListener('click', onDayClick);
+
+  presetBtns.forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      if(!activeCtx) return;
+      const maxD = activeCtx.maxDate || todayISO();
+      let start, end = maxD;
+      const preset = btn.dataset.preset;
+      if(preset==='month') start = maxD.slice(0,8) + '01';
+      else if(preset==='7d') start = addDays(maxD, -6);
+      else if(preset==='30d') start = addDays(maxD, -29);
+      else if(preset==='3m') start = addDays(maxD, -90);
+      else if(preset==='12m') start = addDays(maxD, -365);
+      if(activeCtx.minDate && start < activeCtx.minDate) start = activeCtx.minDate;
+      pendingStart = start; pendingEnd = end; pickingSecond = false;
+      const d = new Date(start+'T00:00:00Z');
+      viewYear = d.getUTCFullYear(); viewMonth = d.getUTCMonth();
+      renderCalendars();
+    });
+  });
+
+  btnPrev.addEventListener('click', ()=>{
+    viewMonth--; if(viewMonth<0){viewMonth=11; viewYear--;}
+    renderCalendars();
+  });
+  btnNext.addEventListener('click', ()=>{
+    viewMonth++; if(viewMonth>11){viewMonth=0; viewYear++;}
+    renderCalendars();
+  });
+  btnCancel.addEventListener('click', closePicker);
+  btnApply.addEventListener('click', applyPicker);
+  document.addEventListener('click', (e)=>{
+    if(popup.style.display==='none' || !activeCtx) return;
+    const path = e.composedPath ? e.composedPath() : [e.target];
+    if(path.includes(popup)) return;
+    if(path.includes(activeCtx.triggerBtn)) return;
+    closePicker();
+  });
+
+  return function initDateRangePicker(triggerId, startInputId, endInputId){
+    const triggerBtn = document.getElementById(triggerId);
+    const startInput = document.getElementById(startInputId);
+    const endInput = document.getElementById(endInputId);
+    const ctx = {
+      triggerBtn, startInput, endInput,
+      get minDate(){ return startInput.min; },
+      get maxDate(){ return endInput.max; },
+    };
+    updateTriggerLabel(ctx);
+    triggerBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(activeCtx===ctx){ closePicker(); return; }
+      openPicker(ctx);
+    });
+  };
+})();
+
+/* ---------------- ORDENAÇÃO GENÉRICA DE TABELAS ---------------- */
+
+const sortState = {};
+
+/* Busca unificada: bate se o texto aparecer no nome OU em qualquer codigo (referencia/sku). */
+function matchNameOrCode(query, name, ...codes){
+  const q = (query||'').trim().toLowerCase();
+  if(!q) return true;
+  if((name||'').toLowerCase().includes(q)) return true;
+  return codes.some(c => (c||'').toLowerCase().includes(q));
+}
+
+/* Celula padrao "produto/referencia": nome do produto em destaque, referencia abaixo (mudo). */
+function productCell(name, ref){
+  return `<div>${name||'—'}</div><div class="pname">${ref||'—'}</div>`;
+}
+/* Celula padrao "tamanho/sku": tamanho em destaque, sku abaixo (mudo). */
+function sizeCell(tamanho, sku){
+  return `<div>${tamanho||'—'}</div><div class="pname">${sku||'—'}</div>`;
+}
+
+function th(tableId, key, label, type, extraCls){
+  const st = sortState[tableId];
+  const active = st && st.key===key;
+  const arrow = active ? (st.dir==='asc' ? ' <span class="sort-arrow">&#9650;</span>' : ' <span class="sort-arrow">&#9660;</span>') : '';
+  return `<th data-key="${key}" data-type="${type}" class="sortable${extraCls?' '+extraCls:''}">${label}${arrow}</th>`;
+}
+
+function applySort(rows, state, accessors){
+  if(!state || !state.key || !accessors[state.key]) return rows.slice();
+  const getVal = accessors[state.key];
+  return rows.slice().sort((a,b)=>{
+    let va = getVal(a), vb = getVal(b);
+    if(typeof va === 'string'){ va = va.toLowerCase(); vb = (vb+'').toLowerCase(); }
+    if(va < vb) return state.dir==='asc' ? -1 : 1;
+    if(va > vb) return state.dir==='asc' ? 1 : -1;
+    return 0;
+  });
+}
+
+function attachSort(tableId, rerenderFn){
+  document.getElementById(tableId).querySelector('thead').addEventListener('click', e=>{
+    const thEl = e.target.closest('th[data-key]');
+    if(!thEl) return;
+    const key = thEl.dataset.key, type = thEl.dataset.type;
+    const cur = sortState[tableId];
+    if(cur && cur.key===key){
+      cur.dir = cur.dir==='asc' ? 'desc' : 'asc';
+    } else {
+      sortState[tableId] = {key, type, dir: type==='text' ? 'asc' : 'desc'};
+    }
+    rerenderFn();
+  });
+}
+
+/* ---------------- TAB 1: CURVA ABC ---------------- */
+
+const salesRows = DATA.sales_rows;
+const salesNames = DATA.sales_names;
+const allDates = salesRows.map(r=>r[1]).sort();
+const minDate = allDates[0], maxDate = allDates[allDates.length-1];
+const statusSet = Array.from(new Set(salesRows.map(r=>r[2]))).sort();
+const statusLabels = {confirmed:'Confirmado', canceled:'Cancelado', received:'Aguardando pagamento'};
+
+function salesByRefForDay(day){
+  const m = new Map();
+  for(const r of salesRows){
+    if(r[1] !== day) continue;
+    const ref = r[0], qty = r[3], rev = r[4];
+    if(!m.has(ref)) m.set(ref, {qty:0, revenue:0});
+    const o = m.get(ref);
+    o.qty += qty; o.revenue += rev;
+  }
+  return m;
+}
+
+const salesBySku = DATA.sales_by_sku || {};
+function skuSalesForDay(sku, day, status){
+  const rec = salesBySku[sku];
+  if(!rec) return {qty:0, revenue:0};
+  const day_rec = rec[day];
+  if(!day_rec) return {qty:0, revenue:0};
+  if(status && status!=='all'){
+    const s = day_rec[status];
+    return s ? {qty:s[0], revenue:s[1]} : {qty:0, revenue:0};
+  }
+  let qty=0, revenue=0;
+  for(const st in day_rec){ qty+=day_rec[st][0]; revenue+=day_rec[st][1]; }
+  return {qty, revenue};
+}
+
+const statusSelect = document.getElementById('f-status');
+statusSet.forEach(s=>{
+  const opt = document.createElement('option');
+  opt.value = s; opt.textContent = statusLabels[s] || s;
+  statusSelect.appendChild(opt);
+});
+
+const startInput = document.getElementById('f-start');
+const endInput = document.getElementById('f-end');
+{
+  const yesterday = addDays(todayISO(), -1);
+  const defaultEnd = yesterday < maxDate ? yesterday : maxDate;
+  const defaultStart = addDays(defaultEnd, -29);
+  endInput.value = defaultEnd;
+  startInput.value = defaultStart < minDate ? minDate : defaultStart;
+}
+startInput.min = minDate; endInput.min = minDate;
+startInput.max = maxDate; endInput.max = maxDate;
+initDateRangePicker('f-daterange-btn', 'f-start', 'f-end');
+
+function filteredRows(start, end, status){
+  return salesRows.filter(r=>{
+    if(r[1] < start || r[1] > end) return false;
+    if(status !== 'all' && r[2] !== status) return false;
+    return true;
+  });
+}
+
+function aggregateByRef(rows){
+  const m = new Map();
+  for(const r of rows){
+    const [ref,,,qty,rev] = r;
+    if(!m.has(ref)) m.set(ref, {qty:0, revenue:0});
+    const o = m.get(ref);
+    o.qty += qty; o.revenue += rev;
+  }
+  return m;
+}
+
+let granReceita='day', topnReceita=5, granQtd='day', topnQtd=5;
+let chartReceita=null, chartQtd=null;
+
+function seg(id, onChange){
+  const el = document.getElementById(id);
+  el.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      el.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed','false'));
+      btn.setAttribute('aria-pressed','true');
+      onChange(btn.dataset.v);
+    });
+  });
+}
+function applyTheme(theme, rerender){
+  document.documentElement.setAttribute('data-theme', theme);
+  const cb = document.getElementById('theme-checkbox');
+  if(cb) cb.checked = theme==='dark';
+  const sw = document.getElementById('theme-switch');
+  if(sw) sw.classList.toggle('is-on', theme==='dark');
+  try{ localStorage.setItem('dashboard-theme', theme); }catch(e){}
+  if(rerender){
+    requestAnimationFrame(()=>{
+      safeRun(render, 'gráficos (troca de tema)');
+      safeRun(renderPadroes, 'Padrões (troca de tema)');
+      safeRun(renderDepositoSaudeCharts, 'gráfico do Depósito (troca de tema)');
+    });
+  }
+}
+document.getElementById('theme-checkbox').addEventListener('change', e=>applyTheme(e.target.checked?'dark':'light', true));
+(function(){
+  let saved = null;
+  try{ saved = localStorage.getItem('dashboard-theme'); }catch(e){}
+  const systemDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved || (systemDark ? 'dark' : 'light'), false);
+})();
+
+let headerPinned = false;
+let movedSub = null, movedSubPh = null;
+let movedCard = null, movedCardPh = null;
+
+function syncDynamicSticky(){
+  const wrap = document.getElementById('sticky-wrap');
+  if(movedSub && movedSubPh){ movedSubPh.replaceWith(movedSub); movedSub=null; movedSubPh=null; }
+  if(movedCard && movedCardPh){ movedCardPh.replaceWith(movedCard); movedCard=null; movedCardPh=null; }
+  if(!headerPinned) return;
+  const topPanel = document.querySelector('#toppanel-padroes.active, #toppanel-produto.active, #toppanel-deposito.active');
+  const sub = topPanel ? topPanel.querySelector(':scope > .tabbar.sub') : null;
+  const leafPanel = topPanel ? (topPanel.querySelector(':scope > .panel.active') || topPanel) : null;
+  const card = leafPanel ? leafPanel.querySelector(':scope > .card') : null;
+  if(sub){
+    movedSubPh = document.createComment('sticky-sub-placeholder');
+    sub.parentNode.insertBefore(movedSubPh, sub);
+    wrap.appendChild(sub);
+    movedSub = sub;
+  }
+  if(card){
+    movedCardPh = document.createComment('sticky-card-placeholder');
+    card.parentNode.insertBefore(movedCardPh, card);
+    wrap.appendChild(card);
+    movedCard = card;
+  }
+}
+
+function applyPin(state, persist){
+  headerPinned = state==='on';
+  const wrap = document.getElementById('sticky-wrap');
+  const header = document.getElementById('pageheader');
+  const topTabbar = document.getElementById('top-tabbar');
+  if(headerPinned){
+    wrap.style.display = 'block';
+    wrap.appendChild(header);
+    wrap.appendChild(topTabbar);
+  } else {
+    wrap.parentNode.insertBefore(header, wrap.nextSibling);
+    header.after(topTabbar);
+    wrap.style.display = 'none';
+  }
+  syncDynamicSticky();
+  const cb = document.getElementById('pin-checkbox');
+  if(cb) cb.checked = headerPinned;
+  const sw = document.getElementById('pin-switch');
+  if(sw) sw.classList.toggle('is-on', headerPinned);
+  if(persist!==false){ try{ localStorage.setItem('dashboard-header-pin', state); }catch(e){} }
+}
+document.getElementById('pin-checkbox').addEventListener('change', e=>applyPin(e.target.checked?'on':'off', true));
+(function(){
+  let savedPin = null;
+  try{ savedPin = localStorage.getItem('dashboard-header-pin'); }catch(e){}
+  applyPin(savedPin || 'off', false);
+})();
+
+seg('seg-gran-receita', v=>{granReceita=v; render();});
+seg('seg-topn-receita', v=>{topnReceita=+v; render();});
+seg('seg-gran-qtd', v=>{granQtd=v; render();});
+seg('seg-topn-qtd', v=>{topnQtd=+v; render();});
+[startInput,endInput,statusSelect].forEach(el=>el.addEventListener('change', render));
+const textFilterAbc = document.getElementById('f-text-abc');
+textFilterAbc.addEventListener('input', render);
+const categoriaAbcSel = document.getElementById('f-categoria-abc');
+populaCategoriaSelect(categoriaAbcSel);
+categoriaAbcSel.addEventListener('change', render);
+attachSort('table-receita', render);
+attachSort('table-qtd', render);
+
+const SERIES = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
+function seriesColor(i){
+  if(i < 8){
+    return getComputedStyle(document.documentElement).getPropertyValue(SERIES[i]).trim();
+  }
+  const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+    && (!document.documentElement.getAttribute('data-theme') || document.documentElement.getAttribute('data-theme')==='dark');
+  const hue = (i * 137.508) % 360;
+  return isDark ? `hsl(${hue.toFixed(0)}, 65%, 68%)` : `hsl(${hue.toFixed(0)}, 60%, 42%)`;
+}
+
+function classify(sortedEntries, totalMetric){
+  let cum = 0;
+  return sortedEntries.map(e=>{
+    cum += e.value;
+    const cumPct = totalMetric>0 ? (cum/totalMetric*100) : 0;
+    let cls = 'C';
+    if(cumPct<=80) cls='A'; else if(cumPct<=95) cls='B';
+    return {...e, cumPct};
+  }).map((e,i,arr)=>({...e, classe: e.cumPct<=80?'A':(e.cumPct<=95?'B':'C')}));
+}
+
+function buildRanking(metricKey, filterText){
+  const start = startInput.value, end = endInput.value, status = statusSelect.value;
+  const dur = dayDiff(start,end)+1;
+  const prevEnd = addDays(start,-1);
+  const prevStart = addDays(prevEnd, -(dur-1));
+
+  const curRows = filteredRows(start,end,status);
+  const prevRows = filteredRows(prevStart,prevEnd,status);
+  const curAgg = aggregateByRef(curRows);
+  const prevAgg = aggregateByRef(prevRows);
+
+  // totais do SITE INTEIRO (nunca afetados pelo filtro de texto) — usados só pra "% do site"
+  let totalSiteRev=0, totalSiteQty=0;
+  curAgg.forEach(o=>{ totalSiteRev+=o.revenue; totalSiteQty+=o.qty; });
+  const totalSiteMetric = metricKey==='revenue' ? totalSiteRev : totalSiteQty;
+
+  let allEntries = Array.from(curAgg.entries()).map(([ref,o])=>({
+    ref, name: salesNames[ref]||ref,
+    value: metricKey==='revenue'?o.revenue:o.qty,
+  })).filter(e=>e.value>0);
+  allEntries.forEach(e=>{ e.siteShare = totalSiteMetric>0 ? e.value/totalSiteMetric*100 : 0; });
+
+  const norm = (filterText||'').trim().toLowerCase();
+  let entries = norm ? allEntries.filter(e=>matchNameOrCode(norm, e.name, e.ref)) : allEntries;
+  entries = entries.filter(e=>matchCategoria(categoriaAbcSel, e.ref));
+  entries.sort((a,b)=>b.value-a.value);
+
+  // curva ABC recalculada dentro do subconjunto filtrado (faz sentido "curva ABC das alpargatas")
+  const filteredTotal = entries.reduce((s,e)=>s+e.value,0);
+  entries = classify(entries, filteredTotal);
+  entries.forEach((e,i)=>{ e.rank = i+1; });
+
+  let totalPrev = 0;
+  entries.forEach(e=>{
+    const prevO = prevAgg.get(e.ref);
+    const prevVal = prevO ? (metricKey==='revenue'?prevO.revenue:prevO.qty) : 0;
+    totalPrev += prevVal;
+    let trend = null;
+    if(prevVal>0) trend = (e.value-prevVal)/prevVal*100;
+    else if(e.value>0) trend = Infinity;
+    e.trend = trend;
+  });
+
+  return {entries, totalCur: filteredTotal, totalPrev, dur, prevStart, prevEnd, totalRevCur: filteredTotal, totalQtyCur: filteredTotal};
+}
+
+function renderKPIs(filterText){
+  const r = buildRanking('revenue', filterText);
+  const q = buildRanking('quantity', filterText);
+  const kpirow = document.getElementById('kpirow');
+  const revTrend = r.totalPrev>0 ? (r.totalRevCur-r.totalPrev)/r.totalPrev*100 : null;
+  const qtyTrend = q.totalPrev>0 ? (q.totalQtyCur-q.totalPrev)/q.totalPrev*100 : null;
+  const ticket = q.totalQtyCur>0 ? r.totalRevCur/q.totalQtyCur : 0;
+
+  function deltaHTML(t){
+    if(t===null) return '<span class="delta flat">sem base de comparação</span>';
+    const cls = t>0.5?'up':(t<-0.5?'down':'flat');
+    const arrow = t>0.5?'&#8599;':(t<-0.5?'&#8600;':'&#8594;');
+    return `<span class="delta ${cls}">${arrow} ${fmtPct(t)} vs período anterior</span>`;
+  }
+
+  kpirow.innerHTML = `
+    <div class="kpi"><p class="label">Receita no período</p><p class="value">${fmtBRL.format(r.totalRevCur)}</p>${deltaHTML(revTrend)}</div>
+    <div class="kpi"><p class="label">Unidades vendidas</p><p class="value">${fmtInt.format(q.totalQtyCur)}</p>${deltaHTML(qtyTrend)}</div>
+    <div class="kpi"><p class="label">Ticket médio por unidade</p><p class="value">${fmtBRL.format(ticket)}</p><span class="delta flat">receita ÷ unidades no período</span></div>
+    <div class="kpi"><p class="label">Referências vendidas</p><p class="value">${fmtInt.format(r.entries.length)}</p><span class="delta flat">no período selecionado</span></div>
+  `;
+  document.getElementById('f-compare-hint').textContent =
+    `Comparando com ${r.prevStart} a ${r.prevEnd} (${r.dur} dias)`;
+}
+
+function renderTable(tableId, entries, metricKey){
+  const table = document.getElementById(tableId);
+  const metricLabel = metricKey==='revenue' ? 'Receita' : 'Unidades';
+  table.querySelector('thead').innerHTML = `<tr>
+    ${th(tableId,'rank','#','number')}
+    ${th(tableId,'classe','Classe','text')}
+    ${th(tableId,'name','Produto/Referência','text')}
+    ${th(tableId,'value',metricLabel,'number','num')}
+    ${th(tableId,'cumPct','% acum.','number','num')}
+    ${th(tableId,'siteShare','% do site','number','num')}
+    ${th(tableId,'trend','Tendência<span class="infotip" tabindex="0" role="img" aria-label="Compara o valor deste produto no período selecionado com o período anterior de mesma duração. Setas indicam alta ou queda de mais de 0,5%; novo significa que o produto não teve vendas no período anterior.">i<span class="tooltip-box">Compara o valor deste produto no período selecionado com o período anterior de mesma duração (ex: últimos 30 dias vs. os 30 dias antes disso). Setas indicam alta ou queda de mais de 0,5%; <b>novo</b> significa que o produto não teve vendas no período anterior.</span></span>','number','num')}
+  </tr>`;
+  const tbody = table.querySelector('tbody');
+  if(entries.length===0){
+    tbody.innerHTML = `<tr><td colspan="7"><div class="emptystate">Nenhum produto encontrado.</div></td></tr>`;
+    return;
+  }
+  const rows = applySort(entries, sortState[tableId], {
+    rank: e=>e.rank, classe: e=>e.classe, name: e=>e.name, value: e=>e.value,
+    cumPct: e=>e.cumPct, siteShare: e=>e.siteShare,
+    trend: e=> e.trend===null ? -Infinity : (e.trend===Infinity ? Infinity : e.trend)
+  });
+  tbody.innerHTML = rows.map(e=>{
+    const badgeClass = e.classe==='A'?'badge-a':(e.classe==='B'?'badge-b':'badge-c');
+    const metricStr = metricKey==='revenue' ? fmtBRL.format(e.value) : fmtInt.format(e.value);
+    let trendStr, trendCls;
+    if(e.trend===null){ trendStr='—'; trendCls='trend-flat'; }
+    else if(e.trend===Infinity){ trendStr='novo'; trendCls='trend-up'; }
+    else { trendStr = fmtPct(e.trend); trendCls = e.trend>0.5?'trend-up':(e.trend<-0.5?'trend-down':'trend-flat'); }
+    return `<tr>
+      <td class="num">${e.rank}</td>
+      <td><span class="badge ${badgeClass}">${e.classe}</span></td>
+      <td>${productCell(e.name, e.ref)}</td>
+      <td class="num">${metricStr}</td>
+      <td class="num">${fmtPctPlain(e.cumPct)}</td>
+      <td class="num">${fmtPctPlain(e.siteShare)}</td>
+      <td class="num ${trendCls}">${trendStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+function bucketRows(rows, gran){
+  const key = gran==='day' ? (d=>d) : (gran==='week' ? isoWeekStart : monthKey);
+  const m = new Map();
+  for(const r of rows){
+    const [ref, date, , qty, rev] = r;
+    const bk = key(date);
+    if(!m.has(bk)) m.set(bk, new Map());
+    const refm = m.get(bk);
+    if(!refm.has(ref)) refm.set(ref, {qty:0, revenue:0});
+    const o = refm.get(ref);
+    o.qty += qty; o.revenue += rev;
+  }
+  return m;
+}
+
+function renderChart(canvasId, chartVarSetter, chartVar, legendId, sparkId, chartwrapId, entries, metricKey, gran, topn, status){
+  if(typeof Chart === 'undefined'){
+    throw new Error('Chart.js não carregou');
+  }
+  const start = startInput.value, end = endInput.value;
+  const topRefs = entries.slice(0, topn).map(e=>e.ref);
+  const rows = filteredRows(start, end, status);
+  const bucketed = bucketRows(rows, gran);
+  const bucketKeys = Array.from(bucketed.keys()).sort();
+
+  const legendEl = document.getElementById(legendId);
+  const sparkEl = document.getElementById(sparkId);
+  const wrapEl = document.getElementById(chartwrapId);
+
+  if(topRefs.length===0){
+    legendEl.innerHTML=''; wrapEl.style.display='none'; sparkEl.style.display='none';
+    return;
+  }
+
+  sparkEl.style.display='none'; sparkEl.innerHTML='';
+  wrapEl.style.display='block';
+  legendEl.innerHTML = topRefs.map((ref,i)=>`<span class="sw"><span class="dot" style="background:${seriesColor(i)}"></span>${ref}</span>`).join('');
+  const datasets = topRefs.map((ref,i)=>({
+    label: ref,
+    data: bucketKeys.map(bk=>{
+      const o = bucketed.get(bk).get(ref);
+      return o ? (metricKey==='revenue'?o.revenue:o.qty) : 0;
+    }),
+    borderColor: seriesColor(i), backgroundColor: seriesColor(i),
+    borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15,
+  }));
+  if(chartVar) chartVar.destroy();
+  const ctx = document.getElementById(canvasId);
+  const newChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels: bucketKeys, datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      plugins:{ legend:{display:false}, tooltip:{
+        itemSort:(a,b)=> b.parsed.y - a.parsed.y,
+        filter:(item, index, array)=>{
+          if(array.length <= 8) return true;
+          const sorted = [...array].sort((a,b)=>b.parsed.y - a.parsed.y);
+          return sorted.indexOf(item) < 8;
+        },
+        callbacks:{
+          label:(c)=> c.dataset.label+': '+(metricKey==='revenue'?fmtBRL.format(c.parsed.y):fmtInt.format(c.parsed.y)),
+          footer:(items)=>{
+            const hidden = topRefs.length - items.length;
+            return hidden>0 ? `+ ${hidden} outros produtos nesse ponto` : '';
+          }
+        }
+      }},
+      scales:{
+        x:{grid:{display:false}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted'), maxRotation:0, autoSkip:true}},
+        y:{grid:{color:getComputedStyle(document.documentElement).getPropertyValue('--grid')}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted'),
+          callback:(v)=> metricKey==='revenue' ? fmtBRL.format(v) : fmtInt.format(v)}}
+      }
+    }
+  });
+  chartVarSetter(newChart);
+}
+
+function render(){
+  const filterText = textFilterAbc.value;
+  renderKPIs(filterText);
+  const status = statusSelect.value;
+  const r = buildRanking('revenue', filterText);
+  const q = buildRanking('quantity', filterText);
+  renderTable('table-receita', r.entries, 'revenue');
+  renderTable('table-qtd', q.entries, 'quantity');
+  try{
+    document.getElementById('chart-fallback-receita').style.display='none';
+    document.getElementById('chart-fallback-qtd').style.display='none';
+    renderChart('chart-receita', c=>chartReceita=c, chartReceita, 'legend-receita','sparkgrid-receita','chartwrap-receita', r.entries, 'revenue', granReceita, topnReceita, status);
+    renderChart('chart-qtd', c=>chartQtd=c, chartQtd, 'legend-qtd','sparkgrid-qtd','chartwrap-qtd', q.entries, 'quantity', granQtd, topnQtd, status);
+  }catch(err){
+    console.error('Falha ao renderizar gráficos:', err);
+    ['chartwrap-receita','chartwrap-qtd'].forEach(id=>{
+      document.getElementById(id).style.display='none';
+    });
+    ['chart-fallback-receita','chart-fallback-qtd'].forEach(id=>{
+      document.getElementById(id).style.display='block';
+    });
+  }
+}
+
+/* ---------------- TOP TAB: PADRÕES ---------------- */
+
+const ordersRaw = DATA.orders_raw || [];
+const ordersGeo = DATA.orders_geo || {};
+
+const fpStartInput = document.getElementById('fp-start');
+const fpEndInput = document.getElementById('fp-end');
+const fpStatusSelect = document.getElementById('fp-status');
+
+const allOrderDates = ordersRaw.map(o=>o[1]).filter(Boolean).sort();
+const fpMinDate = allOrderDates[0], fpMaxDate = allOrderDates[allOrderDates.length-1];
+if(fpMaxDate){
+  const fpYesterday = addDays(todayISO(), -1);
+  const fpDefaultEnd = fpYesterday < fpMaxDate ? fpYesterday : fpMaxDate;
+  const fpDefaultStart = addDays(fpDefaultEnd, -29);
+  fpEndInput.value = fpDefaultEnd;
+  fpStartInput.value = fpDefaultStart < fpMinDate ? fpMinDate : fpDefaultStart;
+  fpStartInput.min = fpMinDate; fpEndInput.min = fpMinDate;
+  fpStartInput.max = fpMaxDate; fpEndInput.max = fpMaxDate;
+  initDateRangePicker('fp-daterange-btn', 'fp-start', 'fp-end');
+}
+
+const fpStatusSet = Array.from(new Set(ordersRaw.map(o=>o[2]))).sort();
+fpStatusSet.forEach(s=>{
+  const opt = document.createElement('option');
+  opt.value = s; opt.textContent = statusLabels[s] || s;
+  fpStatusSelect.appendChild(opt);
+});
+
+function filteredOrdersRaw(start, end, status){
+  return ordersRaw.filter(o=>{
+    if(!o[1] || o[1] < start || o[1] > end) return false;
+    if(status !== 'all' && o[2] !== status) return false;
+    return true;
+  });
+}
+
+const WEEKDAY_NAMES = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+function weekdayIndexMonFirst(dateStr){
+  const d = new Date(dateStr+'T00:00:00Z');
+  const jsDay = d.getUTCDay();
+  return (jsDay+6)%7;
+}
+
+const barCharts = {};
+function renderBarChart(canvasId, labels, values, metricLabel, horizontal, wrapId, valueFormatter){
+  if(wrapId && horizontal){
+    document.getElementById(wrapId).style.height = Math.max(220, labels.length*28+60) + 'px';
+  }
+  if(typeof Chart === 'undefined') return;
+  if(barCharts[canvasId]) barCharts[canvasId].destroy();
+  const ctx = document.getElementById(canvasId);
+  const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  const mutedColor = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim();
+  const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
+  const valueFmt = valueFormatter || ((v)=> fmtBRL.format(v));
+  barCharts[canvasId] = new Chart(ctx, {
+    type:'bar',
+    data:{labels, datasets:[{label:metricLabel, data:values, backgroundColor:accentColor, borderRadius:4, maxBarThickness:28}]},
+    options:{
+      indexAxis: horizontal ? 'y' : 'x',
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{
+        label:(c)=> metricLabel+': '+valueFmt(horizontal ? c.parsed.x : c.parsed.y)
+      }}},
+      scales: horizontal ? {
+        x:{grid:{color:gridColor}, ticks:{color:mutedColor, callback:valueFmt}},
+        y:{grid:{display:false}, ticks:{color:mutedColor}}
+      } : {
+        x:{grid:{display:false}, ticks:{color:mutedColor, maxRotation:0, autoSkip:true}},
+        y:{grid:{color:gridColor}, ticks:{color:mutedColor, callback:valueFmt}}
+      }
+    }
+  });
+}
+
+function renderSortableTable(tableId, columns, rows, emptyMsg){
+  const table = document.getElementById(tableId);
+  const clsFor = (c,i)=> i===0 ? '' : (c.cellClass!==undefined ? c.cellClass : 'num');
+  table.querySelector('thead').innerHTML = '<tr>' + columns.map((c,i)=> th(tableId, c.key, c.label, c.type, clsFor(c,i))).join('') + '</tr>';
+  const tbody = table.querySelector('tbody');
+  if(rows.length===0){
+    tbody.innerHTML = `<tr><td colspan="${columns.length}"><div class="emptystate">${emptyMsg||'Nenhum dado no período selecionado.'}</div></td></tr>`;
+    return;
+  }
+  const accessors = {};
+  columns.forEach(c=>{ accessors[c.key] = c.sortValue; });
+  const sorted = applySort(rows, sortState[tableId], accessors);
+  tbody.innerHTML = sorted.map(row=>'<tr>' + columns.map((c,i)=>{
+    const cls = clsFor(c,i);
+    return `<td${cls?` class="${cls}"`:''}>${c.format(row)}</td>`;
+  }).join('') + '</tr>').join('');
+}
+
+const PERIOD_COLUMNS = (dimLabel, receitaLabel='Receita média/dia', pedidosLabel='Pedidos médios/dia') => [
+  {key:'name', label:dimLabel, type:'text', format:r=>r.name, sortValue:r=>r.name},
+  {key:'avgRevenue', label:receitaLabel, type:'number', format:r=>fmtBRL.format(r.avgRevenue), sortValue:r=>r.avgRevenue},
+  {key:'avgOrders', label:pedidosLabel, type:'number', format:r=>r.avgOrders.toFixed(1).replace('.',','), sortValue:r=>r.avgOrders},
+  {key:'ticket', label:'Ticket médio', type:'number', format:r=>fmtBRL.format(r.ticket), sortValue:r=>r.ticket},
+];
+
+function renderWeekday(orders, start, end){
+  const byWeekday = Array.from({length:7}, ()=>({revenue:0, count:0}));
+  for(const o of orders){
+    const wd = weekdayIndexMonFirst(o[1]);
+    byWeekday[wd].revenue += o[3];
+    byWeekday[wd].count += 1;
+  }
+  const dateCountByWeekday = Array(7).fill(0);
+  let cursor = start;
+  while(cursor <= end){
+    dateCountByWeekday[weekdayIndexMonFirst(cursor)] += 1;
+    cursor = addDays(cursor, 1);
+  }
+  const rows = WEEKDAY_NAMES.map((name,i)=>{
+    const dias = dateCountByWeekday[i] || 1;
+    const avgRevenue = byWeekday[i].revenue / dias;
+    const avgOrders = byWeekday[i].count / dias;
+    const ticket = byWeekday[i].count>0 ? byWeekday[i].revenue/byWeekday[i].count : 0;
+    return {name, avgRevenue, avgOrders, ticket};
+  });
+  renderBarChart('chart-weekday', rows.map(r=>r.name), rows.map(r=>r.avgRevenue), 'Receita média');
+  renderSortableTable('table-weekday', PERIOD_COLUMNS('Dia da semana'), rows);
+}
+
+function renderMonthday(orders, start, end){
+  const byDay = Array.from({length:31}, ()=>({revenue:0, count:0}));
+  for(const o of orders){
+    const day = parseInt(o[1].slice(8,10), 10);
+    byDay[day-1].revenue += o[3];
+    byDay[day-1].count += 1;
+  }
+  const dateCountByDay = Array(31).fill(0);
+  let cursor = start;
+  while(cursor <= end){
+    const day = parseInt(cursor.slice(8,10),10);
+    dateCountByDay[day-1] += 1;
+    cursor = addDays(cursor,1);
+  }
+  const rows = [];
+  for(let i=0;i<31;i++){
+    const dias = dateCountByDay[i];
+    if(dias===0) continue;
+    const avgRevenue = byDay[i].revenue/dias;
+    const avgOrders = byDay[i].count/dias;
+    const ticket = byDay[i].count>0 ? byDay[i].revenue/byDay[i].count : 0;
+    rows.push({name:String(i+1), avgRevenue, avgOrders, ticket});
+  }
+  renderBarChart('chart-monthday', rows.map(r=>r.name), rows.map(r=>r.avgRevenue), 'Receita média');
+  renderSortableTable('table-monthday', PERIOD_COLUMNS('Dia do mês'), rows);
+}
+
+function renderHour(orders, start, end){
+  const byHour = Array.from({length:24}, ()=>({revenue:0, count:0}));
+  for(const o of orders){
+    const hour = o[4];
+    if(hour===null || hour===undefined) continue;
+    byHour[hour].revenue += o[3];
+    byHour[hour].count += 1;
+  }
+  const totalDays = dayDiff(start,end)+1;
+  const rows = byHour.map((h,i)=>{
+    const avgRevenue = h.revenue/totalDays;
+    const avgOrders = h.count/totalDays;
+    const ticket = h.count>0 ? h.revenue/h.count : 0;
+    return {name: String(i).padStart(2,'0')+'h', avgRevenue, avgOrders, ticket};
+  });
+  renderBarChart('chart-hour', rows.map(r=>r.name), rows.map(r=>r.avgRevenue), 'Receita média');
+  renderSortableTable('table-hour', PERIOD_COLUMNS('Horário', 'Receita média da hora', 'Pedidos médios na hora'), rows);
+}
+
+const TURNOS = [
+  {name:'Manhã', test:h=>h>=6 && h<12},
+  {name:'Tarde', test:h=>h>=12 && h<18},
+  {name:'Noite', test:h=>h>=18 || h<6},
+];
+function renderTurno(orders, start, end){
+  const byTurno = TURNOS.map(()=>({revenue:0, count:0}));
+  for(const o of orders){
+    const hour = o[4];
+    if(hour===null || hour===undefined) continue;
+    const idx = TURNOS.findIndex(t=>t.test(hour));
+    if(idx<0) continue;
+    byTurno[idx].revenue += o[3];
+    byTurno[idx].count += 1;
+  }
+  const totalDays = dayDiff(start,end)+1;
+  const rows = TURNOS.map((t,i)=>{
+    const avgRevenue = byTurno[i].revenue/totalDays;
+    const avgOrders = byTurno[i].count/totalDays;
+    const ticket = byTurno[i].count>0 ? byTurno[i].revenue/byTurno[i].count : 0;
+    return {name: t.name, avgRevenue, avgOrders, ticket};
+  });
+  renderBarChart('chart-turno', rows.map(r=>r.name), rows.map(r=>r.avgRevenue), 'Receita média');
+  renderSortableTable('table-turno', PERIOD_COLUMNS('Turno', 'Receita média do turno', 'Pedidos médios no turno'), rows);
+}
+
+const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+function renderMonth(orders, start, end){
+  const byMonth = Array.from({length:12}, ()=>({revenue:0, count:0}));
+  for(const o of orders){
+    const month = parseInt(o[1].slice(5,7), 10);
+    byMonth[month-1].revenue += o[3];
+    byMonth[month-1].count += 1;
+  }
+  // conta quantas vezes cada mes-do-ano apareceu no periodo (por combinacao ano+mes distinta,
+  // nao por dia — um mes parcialmente coberto ainda conta como 1 ocorrencia daquele mes)
+  const occurrencesByMonth = Array(12).fill(0);
+  let cursor = start;
+  let lastYearMonth = null;
+  while(cursor <= end){
+    const yearMonth = cursor.slice(0,7);
+    if(yearMonth !== lastYearMonth){
+      const month = parseInt(cursor.slice(5,7),10);
+      occurrencesByMonth[month-1] += 1;
+      lastYearMonth = yearMonth;
+    }
+    cursor = addDays(cursor,1);
+  }
+  const rows = [];
+  for(let i=0;i<12;i++){
+    const ocorrencias = occurrencesByMonth[i];
+    if(ocorrencias===0) continue;
+    const avgRevenue = byMonth[i].revenue/ocorrencias;
+    const avgOrders = byMonth[i].count/ocorrencias;
+    const ticket = byMonth[i].count>0 ? byMonth[i].revenue/byMonth[i].count : 0;
+    rows.push({name:MONTH_NAMES[i], avgRevenue, avgOrders, ticket});
+  }
+  renderBarChart('chart-month', rows.map(r=>r.name), rows.map(r=>r.avgRevenue), 'Receita média');
+  renderSortableTable('table-month', PERIOD_COLUMNS('Mês', 'Receita média do mês', 'Pedidos médios no mês'), rows);
+}
+
+let topnCity = 20;
+seg('seg-topn-city', v=>{topnCity=+v; renderPadroes();});
+
+const GEO_COLUMNS = (dimLabel) => [
+  {key:'name', label:dimLabel, type:'text', format:r=>r.name, sortValue:r=>r.name},
+  {key:'revenue', label:'Receita total', type:'number', format:r=>fmtBRL.format(r.revenue), sortValue:r=>r.revenue},
+  {key:'count', label:'Número de pedidos', type:'number', format:r=>fmtInt.format(r.count), sortValue:r=>r.count},
+  {key:'ticket', label:'Ticket médio', type:'number', format:r=>fmtBRL.format(r.ticket), sortValue:r=>r.ticket},
+];
+
+function renderGeo(orders){
+  const byState = new Map();
+  const byCity = new Map();
+  let matched = 0;
+  for(const o of orders){
+    const geo = ordersGeo[o[0]];
+    if(!geo || !geo[0]) continue;
+    matched++;
+    const [state, city] = geo;
+    if(!byState.has(state)) byState.set(state, {revenue:0,count:0});
+    const so = byState.get(state);
+    so.revenue += o[3]; so.count += 1;
+    if(city){
+      const cityKey = `${city}/${state}`;
+      if(!byCity.has(cityKey)) byCity.set(cityKey, {revenue:0,count:0});
+      const co = byCity.get(cityKey);
+      co.revenue += o[3]; co.count += 1;
+    }
+  }
+
+  const stateRows = Array.from(byState.entries()).map(([state,o])=>({
+    name: state, revenue:o.revenue, count:o.count, ticket: o.count>0?o.revenue/o.count:0
+  })).sort((a,b)=>b.revenue-a.revenue);
+  renderBarChart('chart-state', stateRows.map(r=>r.name), stateRows.map(r=>r.revenue), 'Receita total');
+  renderSortableTable('table-state', GEO_COLUMNS('Estado'), stateRows);
+
+  let cityRows = Array.from(byCity.entries()).map(([key,o])=>({
+    name:key, revenue:o.revenue, count:o.count, ticket:o.count>0?o.revenue/o.count:0
+  })).sort((a,b)=>b.revenue-a.revenue).slice(0, topnCity);
+  renderBarChart('chart-city', cityRows.map(r=>r.name), cityRows.map(r=>r.revenue), 'Receita total', true, 'chartwrap-city');
+  renderSortableTable('table-city', GEO_COLUMNS('Cidade'), cityRows);
+
+  const coverage = orders.length>0 ? (matched/orders.length*100) : 0;
+  document.getElementById('padroes-address-note').textContent =
+    `Cobertura de endereço: ${coverage.toFixed(1).replace('.',',')}% dos pedidos do período têm estado/cidade identificados.`;
+}
+
+const TAMANHO_COLUMNS = [
+  {key:'tamanho', label:'Tamanho', type:'number', format:r=>r.tamanho, sortValue:r=>+r.tamanho},
+  {key:'qty', label:'Qtd. vendida', type:'number', format:r=>fmtInt.format(r.qty), sortValue:r=>r.qty},
+  {key:'revenue', label:'Receita', type:'number', format:r=>fmtBRL.format(r.revenue), sortValue:r=>r.revenue},
+  {key:'pct', label:'% do total', type:'number', format:r=>fmtPctPlain(r.pct), sortValue:r=>r.pct},
+];
+const textFilterTamanho = document.getElementById('f-text-tamanho');
+const categoriaTamanhoSel = document.getElementById('f-categoria-tamanho');
+populaCategoriaSelect(categoriaTamanhoSel);
+
+function renderTamanho(start, end, status){
+  const filterText = (textFilterTamanho.value||'').trim().toLowerCase();
+  const bySize = {};
+
+  for(const sku in salesBySku){
+    if(sku.startsWith('feir-')) continue;
+    const idx = sku.lastIndexOf('-');
+    if(idx<0) continue;
+    const ref = sku.slice(0, idx);
+    const tamanho = sku.slice(idx+1);
+    if(!/^\d+$/.test(tamanho)) continue;
+    const tamNum = +tamanho;
+    if(tamNum<33 || tamNum>44) continue;
+    if(!matchCategoria(categoriaTamanhoSel, ref)) continue;
+    if(!matchNameOrCode(filterText, salesNames[ref]||ref, ref, sku)) continue;
+    const days = salesBySku[sku];
+    for(const day in days){
+      if(day<start || day>end) continue;
+      const s = skuSalesForDay(sku, day, status);
+      if(!s.qty && !s.revenue) continue;
+      if(!bySize[tamanho]) bySize[tamanho] = {qty:0, revenue:0};
+      bySize[tamanho].qty += s.qty;
+      bySize[tamanho].revenue += s.revenue;
+    }
+  }
+
+  const totalQty = Object.values(bySize).reduce((s,v)=>s+v.qty,0);
+  const rows = Object.keys(bySize).map(t=>({
+    tamanho: t, qty: bySize[t].qty, revenue: bySize[t].revenue,
+    pct: totalQty>0 ? bySize[t].qty/totalQty*100 : 0,
+  })).sort((a,b)=> +a.tamanho - +b.tamanho);
+
+  renderBarChart('chart-tamanho', rows.map(r=>r.tamanho), rows.map(r=>r.qty), 'Qtd. vendida', false, null, v=>fmtInt.format(v));
+  renderSortableTable('table-tamanho', TAMANHO_COLUMNS, rows);
+  document.getElementById('tamanho-summary').textContent = `${fmtInt.format(totalQty)} pares vendidos no período`;
+}
+
+function renderPadroes(){
+  const start = fpStartInput.value, end = fpEndInput.value, status = fpStatusSelect.value;
+  if(!start || !end) return;
+  const orders = filteredOrdersRaw(start, end, status);
+  const totalRevenue = orders.reduce((s,o)=>s+o[3],0);
+  const fpTicket = orders.length>0 ? totalRevenue/orders.length : 0;
+  const fpDias = dayDiff(start,end)+1;
+  const fpReceitaDia = fpDias>0 ? totalRevenue/fpDias : 0;
+  document.getElementById('fp-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Pedidos</p><p class="value">${fmtInt.format(orders.length)}</p><span class="delta flat">no período selecionado</span></div>
+    <div class="kpi"><p class="label">Receita no período</p><p class="value">${fmtBRL.format(totalRevenue)}</p><span class="delta flat">soma de todos os pedidos</span></div>
+    <div class="kpi"><p class="label">Receita média/dia</p><p class="value">${fmtBRL.format(fpReceitaDia)}</p><span class="delta flat">receita ÷ dias no período</span></div>
+    <div class="kpi"><p class="label">Ticket médio por pedido</p><p class="value">${fmtBRL.format(fpTicket)}</p><span class="delta flat">receita ÷ pedidos</span></div>
+  `;
+  document.getElementById('fp-compare-hint').textContent = comparePeriodText(start, end);
+  try{
+    renderWeekday(orders, start, end);
+    renderMonthday(orders, start, end);
+    renderHour(orders, start, end);
+    renderTurno(orders, start, end);
+    renderMonth(orders, start, end);
+    renderGeo(orders);
+    renderTamanho(start, end, status);
+  }catch(err){
+    console.error('Falha ao renderizar Padrões:', err);
+  }
+}
+[fpStartInput, fpEndInput, fpStatusSelect].forEach(el=>el.addEventListener('change', renderPadroes));
+textFilterTamanho.addEventListener('input', ()=>renderTamanho(fpStartInput.value, fpEndInput.value, fpStatusSelect.value));
+categoriaTamanhoSel.addEventListener('change', ()=>renderTamanho(fpStartInput.value, fpEndInput.value, fpStatusSelect.value));
+['table-weekday','table-monthday','table-hour','table-turno','table-month','table-state','table-city','table-tamanho'].forEach(id=>attachSort(id, renderPadroes));
+
+/* ---------------- TAB 2: ESTOQUE POR DIA ---------------- */
+
+const stockRows = DATA.stock_sku;
+const stockDates = Array.from(new Set(stockRows.map(r=>r.data))).sort().reverse();
+
+const diaEstoqueSel = document.getElementById('f-dia-estoque');
+stockDates.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; diaEstoqueSel.appendChild(o); });
+
+function prevAvailableDate(datesDesc, dia){
+  const idx = datesDesc.indexOf(dia);
+  return (idx>=0 && idx+1<datesDesc.length) ? datesDesc[idx+1] : null;
+}
+function diffCellInt(diff){
+  if(diff===null || diff===undefined) return '<span class="trend-flat">—</span>';
+  if(diff===0) return '<span class="trend-flat">0</span>';
+  const cls = diff>0 ? 'trend-up' : 'trend-down';
+  const sign = diff>0 ? '+' : '';
+  return `<span class="${cls}">${sign}${fmtInt.format(diff)}</span>`;
+}
+function diffCellPct(diff){
+  if(diff===null || diff===undefined) return '<span class="trend-flat">—</span>';
+  if(diff===0) return '<span class="trend-flat">0,0 p.p.</span>';
+  const cls = diff>0 ? 'trend-up' : 'trend-down';
+  const sign = diff>0 ? '+' : '';
+  return `<span class="${cls}">${sign}${diff.toFixed(1).replace('.',',')} p.p.</span>`;
+}
+
+function renderEstoque(){
+  const dia = diaEstoqueSel.value;
+  const filterText = (textFilterEstoque.value||'').trim().toLowerCase();
+  let rows = stockRows.filter(r=>r.data===dia);
+  rows = rows.filter(r=>matchCategoria(categoriaEstoqueSel, r.referencia));
+  if(filterText) rows = rows.filter(r=> matchNameOrCode(filterText, r.nome_produto, r.referencia, r.sku));
+
+  const prevDia = prevAvailableDate(stockDates, dia);
+  const prevRows = prevDia ? stockRows.filter(r=>r.data===prevDia) : [];
+  const prevRefTotals = new Map();
+  const prevSkuStock = new Map();
+  for(const r of prevRows){
+    prevRefTotals.set(r.referencia, (prevRefTotals.get(r.referencia)||0) + r.estoque);
+    prevSkuStock.set(r.sku, r.estoque);
+  }
+
+  const byRef = new Map();
+  for(const r of rows){
+    if(!byRef.has(r.referencia)) byRef.set(r.referencia, {nome:r.nome_produto, skus:[]});
+    byRef.get(r.referencia).skus.push(r);
+  }
+
+  const refSales = salesByRefForDay(dia);
+  let refEntries = Array.from(byRef.entries()).map(([ref,o])=>{
+    const total = o.skus.reduce((s,r)=>s+r.estoque,0);
+    const anyAvail = o.skus.some(r=>r.disponivel && r.estoque>0);
+    const allAvail = o.skus.every(r=>r.disponivel && r.estoque>0);
+    let statusKey, statusLabel;
+    if(!anyAvail){ statusKey='vazio'; statusLabel='Sem estoque'; }
+    else if(allAvail){ statusKey='cheia'; statusLabel='Grade cheia'; }
+    else { statusKey='quebrada'; statusLabel='Grade quebrada'; }
+    const sales = refSales.get(ref) || {qty:0, revenue:0};
+    const diffTotal = prevRefTotals.has(ref) ? total - prevRefTotals.get(ref) : null;
+    return {ref, nome:o.nome, total, diffTotal, statusKey, statusLabel, receita:sales.revenue, qtdVendida:sales.qty};
+  });
+
+  const gradeFilterVal = gradeFilterSel.value;
+  if(gradeFilterVal !== 'all') refEntries = refEntries.filter(e=>e.statusKey===gradeFilterVal);
+
+  const tRef = document.getElementById('table-estoque-ref');
+  tRef.querySelector('thead').innerHTML = `<tr>
+    ${th('table-estoque-ref','nome','Produto/Referência','text')}
+    ${th('table-estoque-ref','total','Estoque total','number','num')}
+    ${th('table-estoque-ref','diffTotal','Δ (dia ant.)','number','num')}
+    ${th('table-estoque-ref','statusLabel','Grade','text','center')}
+    ${th('table-estoque-ref','receita','Receita','number','num')}
+    ${th('table-estoque-ref','qtdVendida','Qtd. vendida','number','num')}
+  </tr>`;
+  let refSorted = applySort(refEntries, sortState['table-estoque-ref'], {
+    ref: e=>e.ref, nome: e=>e.nome, total: e=>e.total, diffTotal: e=> e.diffTotal===null? -Infinity : e.diffTotal,
+    statusLabel: e=>e.statusLabel, receita: e=>e.receita, qtdVendida: e=>e.qtdVendida
+  });
+  if(!sortState['table-estoque-ref']) refSorted.sort((a,b)=>a.ref.localeCompare(b.ref));
+  tRef.querySelector('tbody').innerHTML = refSorted.map(e=>{
+    const cls = e.statusKey==='cheia'?'status-cheia':(e.statusKey==='quebrada'?'status-quebrada':'status-vazio');
+    return `<tr><td>${productCell(e.nome, e.ref)}</td><td class="num">${fmtInt.format(e.total)}</td>
+      <td class="num">${diffCellInt(e.diffTotal)}</td>
+      <td class="center"><span class="status-pill ${cls}">${e.statusLabel}</span></td>
+      <td class="num">${fmtBRL.format(e.receita)}</td><td class="num">${fmtInt.format(e.qtdVendida)}</td></tr>`;
+  }).join('') || `<tr><td colspan="6"><div class="emptystate">Nenhum resultado encontrado.</div></td></tr>`;
+
+  let skuRows = rows.slice();
+  const availFilterVal = availFilterSel.value;
+  if(availFilterVal !== 'all'){
+    skuRows = skuRows.filter(r=> availFilterVal==='disponivel' ? (r.disponivel && r.estoque>0) : !(r.disponivel && r.estoque>0));
+  }
+
+  skuRows = skuRows.map(r=>{
+    const sales = skuSalesForDay(r.sku, dia);
+    const prevStock = prevSkuStock.has(r.sku) ? prevSkuStock.get(r.sku) : null;
+    const diffEstoque = prevStock!==null ? r.estoque - prevStock : null;
+    return {...r, receita:sales.revenue, qtdVendida:sales.qty, diffEstoque};
+  });
+
+  const tSku = document.getElementById('table-estoque-sku');
+  tSku.querySelector('thead').innerHTML = `<tr>
+    ${th('table-estoque-sku','nome_produto','Produto/Referência','text')}
+    ${th('table-estoque-sku','tamanho','Tamanho/SKU','text')}
+    ${th('table-estoque-sku','estoque','Estoque','number','num')}
+    ${th('table-estoque-sku','diffEstoque','Δ (dia ant.)','number','num')}
+    ${th('table-estoque-sku','disponivel','Disponível','text','center')}
+    ${th('table-estoque-sku','receita','Receita','number','num')}
+    ${th('table-estoque-sku','qtdVendida','Qtd. vendida','number','num')}
+  </tr>`;
+  let skuSorted = applySort(skuRows, sortState['table-estoque-sku'], {
+    referencia: r=>r.referencia, sku: r=>r.sku, nome_produto: r=>r.nome_produto,
+    tamanho: r=>r.tamanho, estoque: r=>r.estoque, diffEstoque: r=> r.diffEstoque===null? -Infinity : r.diffEstoque,
+    disponivel: r=> (r.disponivel && r.estoque>0) ? 1 : 0,
+    receita: r=>r.receita, qtdVendida: r=>r.qtdVendida
+  });
+  if(!sortState['table-estoque-sku']) skuSorted.sort((a,b)=> a.referencia.localeCompare(b.referencia) || (a.tamanho||'').localeCompare(b.tamanho||''));
+  tSku.querySelector('tbody').innerHTML = skuSorted.map(r=>`<tr>
+    <td>${productCell(r.nome_produto, r.referencia)}</td><td>${sizeCell(r.tamanho, r.sku)}</td>
+    <td class="num">${fmtInt.format(r.estoque)}</td>
+    <td class="num">${diffCellInt(r.diffEstoque)}</td>
+    <td class="center">${r.disponivel && r.estoque>0 ? '<i class="dot-ok">&#10003;</i>' : '<i class="dot-no">&#10007;</i>'}</td>
+    <td class="num">${fmtBRL.format(r.receita)}</td><td class="num">${fmtInt.format(r.qtdVendida)}</td>
+  </tr>`).join('') || `<tr><td colspan="7"><div class="emptystate">Nenhum resultado encontrado.</div></td></tr>`;
+
+  const rupturas = refEntries.filter(e=>e.statusKey==='vazio').length;
+  const quebradas = refEntries.filter(e=>e.statusKey==='quebrada').length;
+  const estoqueTotalUnidades = refEntries.reduce((s,e)=>s+e.total, 0);
+  document.getElementById('estoque-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Referências no estoque</p><p class="value">${fmtInt.format(refEntries.length)}</p><span class="delta flat">no dia selecionado</span></div>
+    <div class="kpi"><p class="label">Estoque total</p><p class="value">${fmtInt.format(estoqueTotalUnidades)}</p><span class="delta flat">unidades somadas</span></div>
+    <div class="kpi"><p class="label">Grade quebrada</p><p class="value">${fmtInt.format(quebradas)}</p><span class="delta flat">algum tamanho faltando</span></div>
+    <div class="kpi"><p class="label">Em ruptura total</p><p class="value">${fmtInt.format(rupturas)}</p><span class="delta flat">grade zerada</span></div>
+  `;
+  document.getElementById('estoque-compare-hint').textContent = prevDia
+    ? `Comparando com ${prevDia.split('-').reverse().join('/')} (dia anterior disponível)`
+    : 'Sem dia anterior disponível para comparação';
+}
+diaEstoqueSel.addEventListener('change', renderEstoque);
+const textFilterEstoque = document.getElementById('f-text-estoque');
+const gradeFilterSel = document.getElementById('f-grade');
+const availFilterSel = document.getElementById('f-disponibilidade');
+const categoriaEstoqueSel = document.getElementById('f-categoria-estoque');
+populaCategoriaSelect(categoriaEstoqueSel);
+categoriaEstoqueSel.addEventListener('change', renderEstoque);
+[textFilterEstoque].forEach(el=>el.addEventListener('input', renderEstoque));
+[gradeFilterSel, availFilterSel].forEach(el=>el.addEventListener('change', renderEstoque));
+attachSort('table-estoque-ref', renderEstoque);
+attachSort('table-estoque-sku', renderEstoque);
+
+/* ---------------- TAB 3: DESCONTOS POR DIA ---------------- */
+
+const discRows = DATA.discounts;
+const discDates = Array.from(new Set(discRows.map(r=>r.data))).sort().reverse();
+const diaDescontoSel = document.getElementById('f-dia-desconto');
+discDates.forEach(d=>{ const o=document.createElement('option'); o.value=d; o.textContent=d; diaDescontoSel.appendChild(o); });
+
+function renderDesconto(){
+  const dia = diaDescontoSel.value;
+  const filterText = (textFilterDesconto.value||'').trim().toLowerCase();
+  let rows = discRows.filter(r=>r.data===dia);
+  rows = rows.filter(r=>matchCategoria(categoriaDescontoSel, r.referencia));
+  if(filterText) rows = rows.filter(r=> matchNameOrCode(filterText, r.nome_produto, r.referencia));
+
+  const discValuesToday = Array.from(new Set(discRows.filter(r=>r.data===dia).map(r=>r.desconto_pct))).sort((a,b)=>a-b);
+  const prevDescVal = descontoValorSel.value;
+  descontoValorSel.innerHTML = '<option value="all">Todos</option>' +
+    discValuesToday.map(v=>`<option value="${v}">${fmtPctPlain(v)}</option>`).join('');
+  if(discValuesToday.some(v=>String(v)===prevDescVal)) descontoValorSel.value = prevDescVal;
+
+  const statusFilterVal = statusDescontoSel.value;
+  if(statusFilterVal==='promo') rows = rows.filter(r=>r.desconto_pct>0);
+  else if(statusFilterVal==='cheio') rows = rows.filter(r=>r.desconto_pct===0);
+
+  const descontoValorVal = descontoValorSel.value;
+  if(descontoValorVal!=='all') rows = rows.filter(r=> String(r.desconto_pct)===descontoValorVal);
+
+  const prevDiaDesc = prevAvailableDate(discDates, dia);
+  const prevDescPct = new Map();
+  if(prevDiaDesc){
+    for(const r of discRows){
+      if(r.data===prevDiaDesc) prevDescPct.set(r.referencia, r.desconto_pct);
+    }
+  }
+
+  const descSales = salesByRefForDay(dia);
+  rows = rows.map(r=>{
+    const sales = descSales.get(r.referencia) || {qty:0, revenue:0};
+    const prevPct = prevDescPct.has(r.referencia) ? prevDescPct.get(r.referencia) : null;
+    const diffDesconto = prevPct!==null ? r.desconto_pct - prevPct : null;
+    return {...r, statusLabel: r.desconto_pct>0 ? 'Em promoção' : 'Preço cheio', receita:sales.revenue, qtdVendida:sales.qty, diffDesconto};
+  });
+
+  const table = document.getElementById('table-desconto');
+  table.querySelector('thead').innerHTML = `<tr>
+    ${th('table-desconto','nome_produto','Produto/Referência','text')}
+    ${th('table-desconto','preco_cheio','Preço cheio','number','num')}
+    ${th('table-desconto','preco_com_desconto','Preço com desconto','number','num')}
+    ${th('table-desconto','desconto_pct','Desconto','number','num')}
+    ${th('table-desconto','diffDesconto','Δ (dia ant.)','number','num')}
+    ${th('table-desconto','statusLabel','Status','text','center')}
+    ${th('table-desconto','receita','Receita','number','num')}
+    ${th('table-desconto','qtdVendida','Qtd. vendida','number','num')}
+  </tr>`;
+  let sorted = applySort(rows, sortState['table-desconto'], {
+    referencia: r=>r.referencia||'', nome_produto: r=>r.nome_produto||'',
+    preco_cheio: r=>r.preco_cheio||0, preco_com_desconto: r=>r.preco_com_desconto||0,
+    desconto_pct: r=>r.desconto_pct, diffDesconto: r=> r.diffDesconto===null? -Infinity : r.diffDesconto,
+    statusLabel: r=>r.statusLabel, receita: r=>r.receita, qtdVendida: r=>r.qtdVendida
+  });
+  if(!sortState['table-desconto']) sorted.sort((a,b)=> b.desconto_pct - a.desconto_pct);
+
+  table.querySelector('tbody').innerHTML = sorted.map(r=>{
+    const emPromo = r.desconto_pct>0;
+    return `<tr>
+      <td>${productCell(r.nome_produto, r.referencia)}</td>
+      <td class="num">${r.preco_cheio!=null?fmtBRL.format(r.preco_cheio):'—'}</td>
+      <td class="num">${r.preco_com_desconto!=null?fmtBRL.format(r.preco_com_desconto):'—'}</td>
+      <td class="num">${fmtPctPlain(r.desconto_pct)}</td>
+      <td class="num">${diffCellPct(r.diffDesconto)}</td>
+      <td class="center">${emPromo?'<span class="badge badge-b">Em promoção</span>':'<span class="badge badge-c">Preço cheio</span>'}</td>
+      <td class="num">${fmtBRL.format(r.receita)}</td><td class="num">${fmtInt.format(r.qtdVendida)}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="8"><div class="emptystate">Nenhum resultado encontrado.</div></td></tr>`;
+
+  const emPromo = rows.filter(r=>r.desconto_pct>0);
+  const emPromoCount = emPromo.length;
+  const descontoMedio = emPromoCount>0 ? emPromo.reduce((s,r)=>s+r.desconto_pct,0)/emPromoCount : 0;
+  const precosValidos = rows.filter(r=>r.preco_com_desconto!=null);
+  const precoMedio = precosValidos.length>0 ? precosValidos.reduce((s,r)=>s+r.preco_com_desconto,0)/precosValidos.length : 0;
+  document.getElementById('desconto-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Produtos</p><p class="value">${fmtInt.format(rows.length)}</p><span class="delta flat">no dia selecionado</span></div>
+    <div class="kpi"><p class="label">Em promoção</p><p class="value">${fmtInt.format(emPromoCount)}</p><span class="delta flat">${rows.length>0 ? fmtPctPlain(emPromoCount/rows.length*100) : '0,0%'} do total</span></div>
+    <div class="kpi"><p class="label">Desconto médio</p><p class="value">${fmtPctPlain(descontoMedio)}</p><span class="delta flat">entre os em promoção</span></div>
+    <div class="kpi"><p class="label">Preço médio com desconto</p><p class="value">${fmtBRL.format(precoMedio)}</p><span class="delta flat">todos os produtos</span></div>
+  `;
+  document.getElementById('desconto-compare-hint').textContent = prevDiaDesc
+    ? `Comparando com ${prevDiaDesc.split('-').reverse().join('/')} (dia anterior disponível)`
+    : 'Sem dia anterior disponível para comparação';
+}
+diaDescontoSel.addEventListener('change', renderDesconto);
+const textFilterDesconto = document.getElementById('f-text-desconto');
+const statusDescontoSel = document.getElementById('f-status-desconto');
+const descontoValorSel = document.getElementById('f-desconto-valor');
+const categoriaDescontoSel = document.getElementById('f-categoria-desconto');
+populaCategoriaSelect(categoriaDescontoSel);
+categoriaDescontoSel.addEventListener('change', renderDesconto);
+textFilterDesconto.addEventListener('input', renderDesconto);
+[statusDescontoSel, descontoValorSel].forEach(el=>el.addEventListener('change', renderDesconto));
+attachSort('table-desconto', renderDesconto);
+
+/* ---------------- TAB 4: VENDA CRUZADA ---------------- */
+
+const crossDataByPeriod = DATA.crosssell || {};
+const periodoCrossSel = document.getElementById('f-periodo-cross');
+const minsupCrossSel = document.getElementById('f-minsup-cross');
+const textFilterCross = document.getElementById('f-text-cross');
+const categoriaCrossSel = document.getElementById('f-categoria-cross');
+populaCategoriaSelect(categoriaCrossSel);
+
+function renderCrossSell(){
+  document.getElementById('cross-compare-hint').textContent = `Baseado em: ${periodoCrossSel.options[periodoCrossSel.selectedIndex].text}`;
+  const crossData = crossDataByPeriod[periodoCrossSel.value] || {same_order_pairs:[], future_pairs:[], repurchase_time:[]};
+  const minsup = +minsupCrossSel.value;
+  const filterText = (textFilterCross.value||'').trim().toLowerCase();
+  const matchPair = r => matchNameOrCode(filterText, r.name_a, r.ref_a) || matchNameOrCode(filterText, r.name_b, r.ref_b);
+  const matchA = r => matchNameOrCode(filterText, r.name_a, r.ref_a);
+  const matchSingle = r => matchNameOrCode(filterText, r.name, r.ref);
+
+  let sameOrderRows = crossData.same_order_pairs.filter(r=> r.pedidos_juntos>=minsup && matchA(r) && matchCategoria(categoriaCrossSel, r.ref_a));
+  let futureRows = crossData.future_pairs.filter(r=> r.clientes>=minsup && matchPair(r) && matchCategoria(categoriaCrossSel, r.ref_a));
+  let repurchaseRows = crossData.repurchase_time.filter(r=> r.amostras>=minsup && matchSingle(r) && matchCategoria(categoriaCrossSel, r.ref));
+
+  const tableSame = document.getElementById('table-same-order');
+  tableSame.querySelector('thead').innerHTML = `<tr>
+    ${th('table-same-order','name_a','Produto comprado','text')}
+    ${th('table-same-order','name_b','Comprado junto','text')}
+    ${th('table-same-order','pedidos_juntos','Pedidos juntos','number','num')}
+    ${th('table-same-order','pct','% dos pedidos','number','num')}
+  </tr>`;
+  let sortedSame = applySort(sameOrderRows, sortState['table-same-order'], {
+    name_a: r=>r.name_a, name_b: r=>r.name_b, pedidos_juntos: r=>r.pedidos_juntos, pct: r=>r.pct
+  });
+  if(!sortState['table-same-order']) sortedSame.sort((a,b)=> b.pedidos_juntos - a.pedidos_juntos);
+  tableSame.querySelector('tbody').innerHTML = sortedSame.map(r=>`<tr>
+    <td>${productCell(r.name_a, r.ref_a)}</td><td>${productCell(r.name_b, r.ref_b)}</td>
+    <td class="num">${fmtInt.format(r.pedidos_juntos)}</td>
+    <td class="num">${fmtPctPlain(r.pct)}</td>
+  </tr>`).join('') || `<tr><td colspan="4"><div class="emptystate">Nenhum resultado encontrado.</div></td></tr>`;
+
+  const tableFuture = document.getElementById('table-future');
+  tableFuture.querySelector('thead').innerHTML = `<tr>
+    ${th('table-future','name_a','Produto comprado','text')}
+    ${th('table-future','name_b','Comprado depois','text')}
+    ${th('table-future','clientes','Clientes','number','num')}
+    ${th('table-future','pct_a','% de clientes','number','num')}
+  </tr>`;
+  let sortedFuture = applySort(futureRows, sortState['table-future'], {
+    name_a: r=>r.name_a, name_b: r=>r.name_b, clientes: r=>r.clientes, pct_a: r=>r.pct_a
+  });
+  if(!sortState['table-future']) sortedFuture.sort((a,b)=> b.clientes - a.clientes);
+  tableFuture.querySelector('tbody').innerHTML = sortedFuture.map(r=>`<tr>
+    <td>${productCell(r.name_a, r.ref_a)}</td><td>${productCell(r.name_b, r.ref_b)}</td>
+    <td class="num">${fmtInt.format(r.clientes)}</td><td class="num">${fmtPctPlain(r.pct_a)}</td>
+  </tr>`).join('') || `<tr><td colspan="4"><div class="emptystate">Nenhum resultado encontrado.</div></td></tr>`;
+
+  const tableRepurchase = document.getElementById('table-repurchase');
+  tableRepurchase.querySelector('thead').innerHTML = `<tr>
+    ${th('table-repurchase','name','Produto/Referência','text')}
+    ${th('table-repurchase','media_dias','Média de dias','number','num')}
+    ${th('table-repurchase','amostras','Amostras','number','num')}
+  </tr>`;
+  let sortedRepurchase = applySort(repurchaseRows, sortState['table-repurchase'], {
+    name: r=>r.name, media_dias: r=>r.media_dias, amostras: r=>r.amostras
+  });
+  if(!sortState['table-repurchase']) sortedRepurchase.sort((a,b)=> b.amostras - a.amostras);
+  tableRepurchase.querySelector('tbody').innerHTML = sortedRepurchase.map(r=>`<tr>
+    <td>${productCell(r.name, r.ref)}</td>
+    <td class="num">${r.media_dias.toFixed(1).replace('.', ',')} dias</td>
+    <td class="num">${fmtInt.format(r.amostras)}</td>
+  </tr>`).join('') || `<tr><td colspan="3"><div class="emptystate">Nenhum resultado encontrado.</div></td></tr>`;
+
+  const totalAmostras = sortedRepurchase.reduce((s,r)=>s+r.amostras,0);
+  const tempoMedioGeral = totalAmostras>0 ? sortedRepurchase.reduce((s,r)=>s+r.media_dias*r.amostras,0)/totalAmostras : 0;
+  document.getElementById('cross-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Pares mesmo pedido</p><p class="value">${fmtInt.format(sortedSame.length)}</p><span class="delta flat">com o filtro atual</span></div>
+    <div class="kpi"><p class="label">Pares futuros</p><p class="value">${fmtInt.format(sortedFuture.length)}</p><span class="delta flat">com o filtro atual</span></div>
+    <div class="kpi"><p class="label">Produtos com recompra</p><p class="value">${fmtInt.format(sortedRepurchase.length)}</p><span class="delta flat">com o filtro atual</span></div>
+    <div class="kpi"><p class="label">Tempo médio até recompra</p><p class="value">${tempoMedioGeral.toFixed(0)} dias</p><span class="delta flat">média ponderada pelas amostras</span></div>
+  `;
+}
+periodoCrossSel.addEventListener('change', renderCrossSell);
+minsupCrossSel.addEventListener('change', renderCrossSell);
+textFilterCross.addEventListener('input', renderCrossSell);
+categoriaCrossSel.addEventListener('change', renderCrossSell);
+['table-same-order','table-future','table-repurchase'].forEach(id=>attachSort(id, renderCrossSell));
+
+/* ---------------- TAB 5: AVISE-ME ---------------- */
+
+const aviseMeData = DATA.avise_me || [];
+const reabastecidoAviseMeSel = document.getElementById('f-reabastecido-avise-me');
+const atendidoAviseMeSel = document.getElementById('f-atendido-avise-me');
+const textFilterAviseMe = document.getElementById('f-text-avise-me');
+const categoriaAviseMeSel = document.getElementById('f-categoria-avise-me');
+populaCategoriaSelect(categoriaAviseMeSel);
+
+const amStartInput = document.getElementById('am-start');
+const amEndInput = document.getElementById('am-end');
+{
+  const amDates = aviseMeData.map(r=>r.data).filter(Boolean).sort();
+  const amMinDate = amDates[0], amMaxDate = amDates[amDates.length-1];
+  if(amMaxDate){
+    const amDefaultStart = addDays(amMaxDate, -29);
+    amEndInput.value = amMaxDate;
+    amStartInput.value = amDefaultStart < amMinDate ? amMinDate : amDefaultStart;
+    amStartInput.min = amMinDate; amEndInput.min = amMinDate;
+    amStartInput.max = amMaxDate; amEndInput.max = amMaxDate;
+    initDateRangePicker('am-daterange-btn', 'am-start', 'am-end');
+  }
+}
+[amStartInput, amEndInput].forEach(el=>el.addEventListener('change', renderAviseMe));
+
+function tamanhoFromSku(sku){
+  if(!sku) return '';
+  const idx = sku.lastIndexOf('-');
+  if(idx<0) return '';
+  const t = sku.slice(idx+1);
+  return /^\d+$/.test(t) ? t : '';
+}
+
+const PII_PASSWORD = '020403';
+let piiRevealed = false;
+
+const AVISE_ME_COLUMNS = [
+  {key:'data', label:'Data', type:'text', format:r=>r.data.split('-').reverse().join('/'), sortValue:r=>r.data},
+  {key:'email', label:'E-mail', type:'text', cellClass:'', format:r=> piiRevealed ? (r.email_full||r.email) : r.email, sortValue:r=>r.email},
+  {key:'phone', label:'Telefone', type:'text', cellClass:'', format:r=> (piiRevealed ? (r.phone_full||r.phone) : r.phone)||'—', sortValue:r=>r.phone||''},
+  {key:'product_name', label:'Produto/Referência', type:'text', cellClass:'', format:r=>productCell(r.product_name, r.referencia), sortValue:r=>r.product_name},
+  {key:'sku', label:'Tamanho/SKU', type:'text', cellClass:'', format:r=>sizeCell(tamanhoFromSku(r.sku), r.sku), sortValue:r=>r.sku},
+  {key:'atendido', label:'Atendido', type:'text', cellClass:'center', format:r=> r.atendido
+      ? '<span class="badge badge-a">✓ Atendido</span>'
+      : '<span class="badge badge-crit">✗ Não atendido</span>',
+    sortValue:r=>r.atendido?1:0},
+  {key:'estoque_atual', label:'Estoque atual', type:'number', format:r=>{
+      const valor = fmtInt.format(r.estoque_atual||0);
+      let icone = '<span class="infotip-spacer"></span>';
+      if(r.presale_dias_extra!=null){
+        const texto = `Venda antecipada com ${r.presale_dias_extra} dias de prazo extra de entrega.`;
+        icone = `<span class="infotip infotip-warn" tabindex="0" role="img" aria-label="${texto}">!<span class="tooltip-box">${texto}</span></span>`;
+      }
+      return `<span class="num-with-icon">${valor}${icone}</span>`;
+    }, sortValue:r=>r.estoque_atual||0},
+  {key:'reposicao_qtd', label:'Reposição', type:'number', format:r=>{
+      if(r.reposicao_qtd==null) return '—';
+      const dataFmt = r.reposicao_data.split('-').reverse().join('/');
+      const texto = `Chegada prevista: ${dataFmt}`;
+      return `<span class="infotip infotip-plain" tabindex="0" role="img" aria-label="${texto}">${fmtInt.format(r.reposicao_qtd)}<span class="tooltip-box">${texto}</span></span>`;
+    }, sortValue:r=>r.reposicao_qtd||0},
+];
+
+const AVISE_ME_RANKING_COLUMNS = [
+  {key:'name', label:'Produto/Referência', type:'text', cellClass:'', format:r=>productCell(r.name, r.ref), sortValue:r=>r.name},
+  {key:'sku', label:'Tamanho/SKU', type:'text', cellClass:'', format:r=>sizeCell(tamanhoFromSku(r.sku), r.sku), sortValue:r=>r.sku},
+  {key:'total', label:'Pedidos de aviso', type:'number', format:r=>fmtInt.format(r.total), sortValue:r=>r.total},
+  {key:'atendidos', label:'Atendidos', type:'number', format:r=>fmtInt.format(r.atendidos), sortValue:r=>r.atendidos},
+  {key:'pctAtendido', label:'% atendido', type:'number', format:r=>fmtPctPlain(r.pctAtendido), sortValue:r=>r.pctAtendido},
+];
+
+function renderAviseMe(){
+  const start = amStartInput.value, end = amEndInput.value;
+  const reabastecidoVal = reabastecidoAviseMeSel.value;
+  const atendidoVal = atendidoAviseMeSel.value;
+  const filterText = (textFilterAviseMe.value||'').trim().toLowerCase();
+
+  let rows = aviseMeData;
+  if(start && end) rows = rows.filter(r=> r.data>=start && r.data<=end);
+  if(reabastecidoVal==='sim') rows = rows.filter(r=>(r.estoque_atual||0)>0);
+  else if(reabastecidoVal==='nao') rows = rows.filter(r=>!(r.estoque_atual>0));
+  if(atendidoVal==='sim') rows = rows.filter(r=>r.atendido);
+  else if(atendidoVal==='nao') rows = rows.filter(r=>!r.atendido);
+  rows = rows.filter(r=>matchCategoria(categoriaAviseMeSel, r.referencia));
+  if(filterText) rows = rows.filter(r=> matchNameOrCode(filterText, r.product_name, r.referencia, r.sku));
+  if(!sortState['table-avise-me']) rows = rows.slice().sort((a,b)=> b.data.localeCompare(a.data));
+
+  renderSortableTable('table-avise-me', AVISE_ME_COLUMNS, rows);
+
+  const atendidos = rows.filter(r=>r.atendido).length;
+  const comEstoque = rows.filter(r=>(r.estoque_atual||0)>0).length;
+  const produtosUnicos = new Set(rows.map(r=>r.sku||r.referencia)).size;
+  document.getElementById('avise-me-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Registros</p><p class="value">${fmtInt.format(rows.length)}</p><span class="delta flat">com o filtro atual</span></div>
+    <div class="kpi"><p class="label">Produtos únicos</p><p class="value">${fmtInt.format(produtosUnicos)}</p><span class="delta flat">SKUs distintos</span></div>
+    <div class="kpi"><p class="label">Com estoque</p><p class="value">${fmtInt.format(comEstoque)}</p><span class="delta flat">${rows.length>0 ? fmtPctPlain(comEstoque/rows.length*100) : '0,0%'} do total</span></div>
+    <div class="kpi"><p class="label">Atendidos</p><p class="value">${fmtInt.format(atendidos)}</p><span class="delta flat">${rows.length>0 ? fmtPctPlain(atendidos/rows.length*100) : '0,0%'} do total</span></div>
+  `;
+  if(start && end) document.getElementById('am-compare-hint').textContent = comparePeriodText(start, end);
+
+  const rankMap = {};
+  for(const r of rows){
+    const key = r.sku || r.referencia || r.product_name;
+    if(!rankMap[key]) rankMap[key] = {ref: r.referencia, name: r.product_name, sku: r.sku, total:0, atendidos:0};
+    rankMap[key].total++;
+    if(r.atendido) rankMap[key].atendidos++;
+  }
+  let rankRows = Object.values(rankMap).map(v=>({...v, pctAtendido: v.total>0 ? v.atendidos/v.total*100 : 0}));
+  if(!sortState['table-avise-me-ranking']) rankRows = rankRows.sort((a,b)=> b.total-a.total);
+  renderSortableTable('table-avise-me-ranking', AVISE_ME_RANKING_COLUMNS, rankRows);
+}
+reabastecidoAviseMeSel.addEventListener('change', renderAviseMe);
+atendidoAviseMeSel.addEventListener('change', renderAviseMe);
+textFilterAviseMe.addEventListener('input', renderAviseMe);
+categoriaAviseMeSel.addEventListener('change', renderAviseMe);
+attachSort('table-avise-me', renderAviseMe);
+attachSort('table-avise-me-ranking', renderAviseMe);
+
+const piiToggleBtn = document.getElementById('pii-toggle-btn');
+const piiPopover = document.getElementById('pii-popover');
+const piiPasswordInput = document.getElementById('pii-password-input');
+const piiPasswordError = document.getElementById('pii-password-error');
+
+function setPiiRevealed(v){
+  piiRevealed = v;
+  piiToggleBtn.classList.toggle('is-open', v);
+  const label = v ? 'Ocultar e-mail e telefone' : 'Mostrar e-mail e telefone completos';
+  piiToggleBtn.setAttribute('aria-label', label);
+  piiToggleBtn.title = label;
+  renderAviseMe();
+}
+
+function openPiiPopover(){
+  piiPasswordError.textContent = '';
+  piiPasswordInput.value = '';
+  piiPopover.classList.add('open');
+  piiPasswordInput.focus();
+}
+function closePiiPopover(){
+  piiPopover.classList.remove('open');
+}
+function submitPiiPassword(){
+  if(piiPasswordInput.value === PII_PASSWORD){
+    closePiiPopover();
+    setPiiRevealed(true);
+  } else {
+    piiPasswordError.textContent = 'Senha incorreta.';
+    piiPasswordInput.value = '';
+    piiPasswordInput.focus();
+  }
+}
+
+piiToggleBtn.addEventListener('click', ()=>{
+  if(piiRevealed) setPiiRevealed(false);
+  else openPiiPopover();
+});
+document.getElementById('pii-password-submit').addEventListener('click', submitPiiPassword);
+piiPasswordInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter') submitPiiPassword();
+  if(e.key==='Escape') closePiiPopover();
+});
+document.addEventListener('click', e=>{
+  if(piiPopover.classList.contains('open') && !piiPopover.contains(e.target) && !piiToggleBtn.contains(e.target)){
+    closePiiPopover();
+  }
+});
+
+/* ---------------- REPOSICOES (calendario de PO com fornecedores) ---------------- */
+
+const reposicoesData = DATA.reposicoes || [];
+const presaleData = DATA.controle_prazo || [];
+const presaleSkuSet = new Set(presaleData.map(r=>r.sku));
+const statusReposicoesSel = document.getElementById('f-status-reposicoes');
+const estoqueReposicoesSel = document.getElementById('f-estoque-reposicoes');
+const textFilterReposicoes = document.getElementById('f-text-reposicoes');
+const categoriaReposicoesSel = document.getElementById('f-categoria-reposicoes');
+populaCategoriaSelect(categoriaReposicoesSel);
+
+function reposicaoStatus(diasAte){
+  if(diasAte < 0) return {key:'atrasado', label:`Atrasado (${Math.abs(diasAte)}d)`, cls:'badge-crit'};
+  if(diasAte <= 7) return {key:'breve', label:`Em breve (${diasAte}d)`, cls:'badge-b'};
+  return {key:'prazo', label:'No prazo', cls:'badge-c'};
+}
+
+const REPOSICOES_COLUMNS = [
+  {key:'nome', label:'Produto/Referência', type:'text', cellClass:'', format:r=>productCell(r.nome, r.referencia), sortValue:r=>r.nome},
+  {key:'sku', label:'Tamanho/SKU', type:'text', cellClass:'', format:r=>sizeCell(tamanhoFromSku(r.sku), r.sku), sortValue:r=>r.sku},
+  {key:'estoque_atual', label:'Estoque atual', type:'number', format:r=>fmtInt.format(r.estoque_atual), sortValue:r=>r.estoque_atual},
+  {key:'quantidade', label:'Qtd. a receber', type:'number', format:r=>fmtInt.format(r.quantidade), sortValue:r=>r.quantidade},
+  {key:'data_prevista', label:'Previsão de chegada', type:'text', format:r=>r.data_prevista.split('-').reverse().join('/'), sortValue:r=>r.data_prevista},
+  {key:'status', label:'Status', type:'text', cellClass:'center', format:r=>{
+      const s = reposicaoStatus(r._diasAte);
+      return `<span class="badge ${s.cls}">${s.label}</span>`;
+    }, sortValue:r=>r._diasAte},
+  {key:'em_presale', label:'Em pré-venda', type:'text', cellClass:'center', format:r=> presaleSkuSet.has(r.sku)
+      ? '<span class="badge badge-a">✓ Sim</span>'
+      : '<span class="badge badge-crit">✗ Não</span>',
+    sortValue:r=> presaleSkuSet.has(r.sku)?1:0},
+];
+
+const PRESALE_COLUMNS = [
+  {key:'nome', label:'Produto/Referência', type:'text', cellClass:'', format:r=>productCell(r.nome, r.referencia), sortValue:r=>r.nome},
+  {key:'sku', label:'Tamanho/SKU', type:'text', cellClass:'', format:r=>sizeCell(tamanhoFromSku(r.sku), r.sku), sortValue:r=>r.sku},
+  {key:'estoque_atual', label:'Estoque atual', type:'number', format:r=>fmtInt.format(r.estoque_atual), sortValue:r=>r.estoque_atual},
+  {key:'dias_add_frete', label:'Prazo extra de entrega', type:'number', format:r=>`${r.dias_add_frete} dias`, sortValue:r=>r.dias_add_frete},
+  {key:'data_chegada', label:'Data de chegada', type:'text', format:r=>r.data_chegada.split('-').reverse().join('/'), sortValue:r=>r.data_chegada},
+  {key:'status', label:'Status', type:'text', cellClass:'center', format:r=>{
+      const s = reposicaoStatus(r._diasAte);
+      return `<span class="badge ${s.cls}">${s.label}</span>`;
+    }, sortValue:r=>r._diasAte},
+];
+
+function renderReposicoes(){
+  const statusVal = statusReposicoesSel.value;
+  const estoqueVal = estoqueReposicoesSel.value;
+  const filterText = (textFilterReposicoes.value||'').trim().toLowerCase();
+  const today = todayISO();
+  document.getElementById('reposicoes-compare-hint').textContent =
+    `Baseado em: snapshot de estoque de ${stockDates[0].split('-').reverse().join('/')}`;
+
+  let rows = reposicoesData.map(r=>({...r, _diasAte: dayDiff(today, r.data_prevista)}));
+  if(statusVal!=='all') rows = rows.filter(r=> reposicaoStatus(r._diasAte).key===statusVal);
+  if(estoqueVal==='zero') rows = rows.filter(r=> r.estoque_atual===0);
+  else if(estoqueVal==='com') rows = rows.filter(r=> r.estoque_atual>0);
+  rows = rows.filter(r=>matchCategoria(categoriaReposicoesSel, r.referencia));
+  if(filterText) rows = rows.filter(r=> matchNameOrCode(filterText, r.nome, r.referencia, r.sku));
+  if(!sortState['table-reposicoes']) rows = rows.slice().sort((a,b)=> a.data_prevista.localeCompare(b.data_prevista));
+
+  renderSortableTable('table-reposicoes', REPOSICOES_COLUMNS, rows, 'Nenhuma reposição em aberto com o filtro atual.');
+
+  const qtdTotal = rows.reduce((s,r)=>s+r.quantidade,0);
+  const atrasados = rows.filter(r=>r._diasAte<0).length;
+  const proxima = rows.slice().sort((a,b)=>a._diasAte-b._diasAte).find(r=>true);
+  document.getElementById('reposicoes-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">SKUs aguardando reposição</p><p class="value">${fmtInt.format(rows.length)}</p><span class="delta flat">com o filtro atual</span></div>
+    <div class="kpi"><p class="label">Quantidade total a receber</p><p class="value">${fmtInt.format(qtdTotal)}</p><span class="delta flat">unidades somadas</span></div>
+    <div class="kpi"><p class="label">Próxima chegada</p><p class="value">${proxima ? proxima.data_prevista.split('-').reverse().join('/') : '—'}</p><span class="delta flat">${proxima ? reposicaoStatus(proxima._diasAte).label : 'sem registros'}</span></div>
+    <div class="kpi"><p class="label">Atrasados</p><p class="value">${fmtInt.format(atrasados)}</p><span class="delta flat">${rows.length>0 ? fmtPctPlain(atrasados/rows.length*100) : '0,0%'} do total</span></div>
+  `;
+
+  let presaleRows = presaleData.map(r=>({...r, _diasAte: dayDiff(today, r.data_chegada)}));
+  if(statusVal!=='all') presaleRows = presaleRows.filter(r=> reposicaoStatus(r._diasAte).key===statusVal);
+  if(estoqueVal==='zero') presaleRows = presaleRows.filter(r=> r.estoque_atual===0);
+  else if(estoqueVal==='com') presaleRows = presaleRows.filter(r=> r.estoque_atual>0);
+  if(filterText) presaleRows = presaleRows.filter(r=> matchNameOrCode(filterText, r.nome, r.referencia, r.sku));
+  if(!sortState['table-presale']) presaleRows = presaleRows.slice().sort((a,b)=> a.data_chegada.localeCompare(b.data_chegada));
+
+  renderSortableTable('table-presale', PRESALE_COLUMNS, presaleRows, 'Nenhum SKU em pré-venda com o filtro atual.');
+  document.getElementById('presale-summary').textContent =
+    `${fmtInt.format(presaleRows.length)} SKU(s) com prazo de frete estendido para permitir venda antes da chegada do estoque.`;
+}
+statusReposicoesSel.addEventListener('change', renderReposicoes);
+estoqueReposicoesSel.addEventListener('change', renderReposicoes);
+textFilterReposicoes.addEventListener('input', renderReposicoes);
+categoriaReposicoesSel.addEventListener('change', renderReposicoes);
+attachSort('table-reposicoes', renderReposicoes);
+attachSort('table-presale', renderReposicoes);
+
+/* ---------------- COMPRAS (calculadora de necessidade de compra) ---------------- */
+
+const categoriaComprasSel = document.getElementById('f-categoria-compras');
+const textFilterCompras = document.getElementById('f-text-compras');
+const leadTimeComprasInput = document.getElementById('f-leadtime-compras');
+const coberturaComprasInput = document.getElementById('f-cobertura-compras');
+const moqComprasInput = document.getElementById('f-moq-compras');
+const janelaComprasInput = document.getElementById('f-janela-compras');
+
+/* Parte cara e independente dos filtros (estoque/reposicao por SKU): calculada uma vez e cacheada.
+   Vendas ficam de fora daqui porque a janela de dias e ajustavel pelo usuario. */
+function computeComprasBase(){
+  const latestStockDate = stockDates[0];
+  /* Calcado de grade numerica (33-44) entra pra distribuir a necessidade por tamanho.
+     Acessorios de tamanho unico (campo tamanho vazio - bolsas, bones, carteiras etc.)
+     tambem entram, mas como uma unica "grade" de 1 item so - sem distribuicao por
+     tamanho. Grades nao numericas (chinelos 35/36 etc, calcado infantil) ficam de fora,
+     porque tem logica de tamanho propria que essa conta nao cobre ainda. */
+  const skuInfo = stockRows.filter(r=>
+    r.data===latestStockDate && r.ativo==='True' &&
+    ((/^\d+$/.test(r.tamanho) && +r.tamanho>=33 && +r.tamanho<=44) || !r.tamanho)
+  );
+
+  const reposPorSku = {};
+  (DATA.reposicoes||[]).forEach(r=>{ reposPorSku[r.sku] = (reposPorSku[r.sku]||0) + r.quantidade; });
+
+  const porProduto = {};
+  skuInfo.forEach(r=>{
+    if(!porProduto[r.referencia]) porProduto[r.referencia] = { referencia: r.referencia, nome: r.nome_produto, categoria: r.categoria || 'Sem categoria', skus: [] };
+    porProduto[r.referencia].skus.push({
+      sku: r.sku, tamanho: r.tamanho || 'Único', estoque: r.estoque, reposicao: reposPorSku[r.sku]||0,
+    });
+  });
+
+  return Object.values(porProduto);
+}
+
+function vendasNoPeriodo(sku, janelaDias){
+  const days = salesBySku[sku];
+  if(!days) return 0;
+  const today = todayISO();
+  const janelaStart = addDays(today, -janelaDias);
+  let qty = 0;
+  for(const day in days){
+    if(day < janelaStart || day > today) continue;
+    qty += skuSalesForDay(sku, day, 'all').qty;
+  }
+  return qty;
+}
+
+/* Avisos de "demanda reprimida" ainda nao atendidos dentro da janela: sinal de venda perdida
+   por ruptura de estoque, que nao aparece nas vendas realizadas. Avisos ja atendidos sao
+   ignorados porque a compra que os atendeu ja esta contada em vendasNoPeriodo. */
+function demandaReprimidaNoPeriodo(sku, janelaDias){
+  const today = todayISO();
+  const janelaStart = addDays(today, -janelaDias);
+  return aviseMeData.filter(r=> r.sku===sku && !r.atendido && r.data>=janelaStart && r.data<=today).length;
+}
+
+/* Vendas, necessidade e quebra por tamanho: recalculadas a cada render com os filtros atuais. */
+function computeComprasNecessidade(produtosBase, leadTime, cobertura, moq, janelaDias){
+  const linhas = [];
+  produtosBase.forEach(p=>{
+    const skus = p.skus.map(v=>{
+      const vendas = vendasNoPeriodo(v.sku, janelaDias);
+      const demandaReprimida = demandaReprimidaNoPeriodo(v.sku, janelaDias);
+      return {...v, vendas, demandaReprimida, vendasAjustadas: vendas + demandaReprimida};
+    });
+    const estoqueTotal = skus.reduce((s,v)=>s+v.estoque,0);
+    const reposicaoTotal = skus.reduce((s,v)=>s+v.reposicao,0);
+    const vendasTotal = skus.reduce((s,v)=>s+v.vendasAjustadas,0);
+    const taxaDiaria = vendasTotal / janelaDias;
+    const demandaProjetada = taxaDiaria * (leadTime + cobertura);
+    const necessidadeBruta = Math.max(0, demandaProjetada - estoqueTotal - reposicaoTotal);
+    /* So forca o pedido minimo se a necessidade bruta justificar abrir um lote: abaixo de 30%
+       do MOQ, nao vale a pena comprar so pra bater a quantidade minima do fornecedor. */
+    const necessidade = necessidadeBruta >= moq*0.3 ? Math.max(Math.ceil(necessidadeBruta), moq) : 0;
+
+    const comVenda = skus.filter(v=>v.vendasAjustadas>0);
+    const base = comVenda.length>0 ? comVenda : skus;
+    const totalRef = base.reduce((s,v)=>s+(v.vendasAjustadas||1),0);
+    const comprarPorSku = {};
+    if(necessidade>0){
+      let alocado = 0;
+      const raw = base.map(v=>{
+        const pct = (v.vendasAjustadas||1)/totalRef;
+        const exata = necessidade*pct;
+        const piso = Math.floor(exata);
+        alocado += piso;
+        return {sku:v.sku, piso, resto: exata-piso};
+      });
+      let sobra = necessidade - alocado;
+      raw.sort((a,b)=> b.resto - a.resto);
+      for(let i=0;i<raw.length && sobra>0;i++){ raw[i].piso += 1; sobra--; }
+      raw.forEach(v=>{ comprarPorSku[v.sku] = v.piso; });
+    }
+
+    skus.forEach(v=>{
+      linhas.push({
+        referencia: p.referencia, nome: p.nome, categoria: p.categoria, sku: v.sku, tamanho: v.tamanho,
+        estoque: v.estoque, vendas: v.vendas, demandaReprimida: v.demandaReprimida, reposicao: v.reposicao,
+        comprar: comprarPorSku[v.sku] || 0, taxaDiariaProduto: taxaDiaria, estoqueProdutoTotal: estoqueTotal,
+      });
+    });
+  });
+  return linhas;
+}
+
+const COMPRAS_COLUMNS = [
+  {key:'nome', label:'Produto/Referência', type:'text', cellClass:'', format:r=>productCell(r.nome, r.referencia), sortValue:r=>r.nome},
+  {key:'categoria', label:'Categoria', type:'text', cellClass:'', format:r=>r.categoria, sortValue:r=>r.categoria},
+  {key:'sku', label:'Tamanho/SKU', type:'text', cellClass:'', format:r=>sizeCell(r.tamanho, r.sku), sortValue:r=>r.sku},
+  {key:'estoque', label:'Estoque atual', type:'number', format:r=>fmtInt.format(r.estoque), sortValue:r=>r.estoque},
+  {key:'vendas', label:'Vendas no período', type:'number', format:r=>fmtInt.format(r.vendas), sortValue:r=>r.vendas},
+  {key:'demandaReprimida', label:'Demanda reprimida', type:'number', format:r=>fmtInt.format(r.demandaReprimida), sortValue:r=>r.demandaReprimida},
+  {key:'reposicao', label:'Reposição em aberto', type:'number', format:r=>fmtInt.format(r.reposicao), sortValue:r=>r.reposicao},
+  {key:'comprar', label:'Comprar', type:'number', format:r=> r.comprar>0 ? `<b>${fmtInt.format(r.comprar)}</b>` : '—', sortValue:r=>r.comprar},
+];
+
+let comprasBaseCache = null;
+
+function renderCompras(){
+  if(!comprasBaseCache){
+    comprasBaseCache = computeComprasBase();
+    const categorias = Array.from(new Set(comprasBaseCache.map(p=>p.categoria))).sort((a,b)=>a.localeCompare(b));
+    categoriaComprasSel.innerHTML = '<option value="all">Todas</option>' +
+      categorias.map(c=>`<option value="${c}">${c}</option>`).join('');
+  }
+  const catVal = categoriaComprasSel.value;
+  const filterText = (textFilterCompras.value||'').trim().toLowerCase();
+  const leadTime = Math.max(0, +leadTimeComprasInput.value || 0);
+  const cobertura = Math.max(0, +coberturaComprasInput.value || 0);
+  const moq = Math.max(0, +moqComprasInput.value || 0);
+  const janelaDias = Math.max(1, +janelaComprasInput.value || 1);
+  document.getElementById('compras-compare-hint').textContent = `Baseado em: últimos ${janelaDias} dias`;
+
+  let produtosBase = comprasBaseCache.filter(p=> matchNameOrCode(filterText, p.nome, p.referencia));
+  if(catVal!=='all') produtosBase = produtosBase.filter(p=>p.categoria===catVal);
+  let linhas = computeComprasNecessidade(produtosBase, leadTime, cobertura, moq, janelaDias);
+  if(!sortState['table-compras-sku']) linhas = linhas.sort((a,b)=> b.comprar - a.comprar || a.nome.localeCompare(b.nome) || ((+a.tamanho||0) - (+b.tamanho||0)));
+  renderSortableTable('table-compras-sku', COMPRAS_COLUMNS, linhas, 'Nenhum SKU encontrado com o filtro atual.');
+
+  const skusComNecessidade = linhas.filter(r=>r.comprar>0);
+  const totalPares = skusComNecessidade.reduce((s,r)=>s+r.comprar,0);
+  const produtosComNecessidade = new Set(skusComNecessidade.map(r=>r.referencia)).size;
+  const produtosTotal = new Set(linhas.map(r=>r.referencia)).size;
+  const coberturaPorProduto = {};
+  linhas.forEach(r=>{ coberturaPorProduto[r.referencia] = r.taxaDiariaProduto>0 ? r.estoqueProdutoTotal/r.taxaDiariaProduto : null; });
+  const coberturas = Object.values(coberturaPorProduto).filter(v=>v!==null);
+  const coberturaMedia = coberturas.length>0 ? coberturas.reduce((s,v)=>s+v,0)/coberturas.length : null;
+  document.getElementById('compras-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Produtos com necessidade</p><p class="value">${fmtInt.format(produtosComNecessidade)}</p><span class="delta flat">de ${fmtInt.format(produtosTotal)} produtos no filtro atual</span></div>
+    <div class="kpi"><p class="label">Total de unidades a comprar</p><p class="value">${fmtInt.format(totalPares)}</p><span class="delta flat">somando todos os SKUs</span></div>
+    <div class="kpi"><p class="label">SKUs com necessidade</p><p class="value">${fmtInt.format(skusComNecessidade.length)}</p><span class="delta flat">de ${fmtInt.format(linhas.length)} SKUs no filtro atual</span></div>
+    <div class="kpi"><p class="label">Cobertura média atual</p><p class="value">${coberturaMedia===null ? '—' : Math.round(coberturaMedia)+' dias'}</p><span class="delta flat">estoque ÷ venda média diária</span></div>
+  `;
+}
+categoriaComprasSel.addEventListener('change', renderCompras);
+textFilterCompras.addEventListener('input', renderCompras);
+leadTimeComprasInput.addEventListener('input', renderCompras);
+coberturaComprasInput.addEventListener('input', renderCompras);
+moqComprasInput.addEventListener('input', renderCompras);
+janelaComprasInput.addEventListener('input', renderCompras);
+attachSort('table-compras-sku', renderCompras);
+
+/* ---------------- DEPOSITO (organizacao fisica de estoque no galpao) ---------------- */
+
+const depositoData = DATA.estoque_deposito || {};
+const CATEGORIA_LABEL = {pequena:'Pequena', media:'Média', grande:'Grande'};
+const CATEGORIA_BADGE = {pequena:'badge-a', media:'badge-b', grande:'badge-c'};
+
+function categoriaBadge(cat){
+  return `<span class="badge ${CATEGORIA_BADGE[cat]||'badge-c'}">${CATEGORIA_LABEL[cat]||cat}</span>`;
+}
+
+const CATEGORIA_COR = {pequena:'var(--s1)', media:'var(--s4)', grande:'var(--s2)', reservada:'var(--text-muted)', vazia:'var(--border-strong)'};
+const CATEGORIA_LABEL_MAPA = {pequena:'Pequena (alpargatas)', media:'Média (sandálias/tênis/mule)', grande:'Grande (botas/plataforma)', reservada:'Reservada (Feirinha/acessórios)'};
+
+const DEPOSITO_ESTAGIOS = [
+  {max:60,  numero:1, label:'Estoque baixo'},
+  {max:85,  numero:2, label:'Ocupação moderada'},
+  {max:105, numero:3, label:'Ocupação alta'},
+  {max:130, numero:4, label:'Estantes lotadas'},
+  {max:Infinity, numero:5, label:'Estourando a capacidade'},
+];
+
+function renderDepositoIlustracao(pct){
+  const estagio = DEPOSITO_ESTAGIOS.find(e => pct < e.max) || DEPOSITO_ESTAGIOS[DEPOSITO_ESTAGIOS.length-1];
+  const img = document.getElementById('deposito-ilustracao');
+  const src = DEPOSITO_ILUSTRACOES[String(estagio.numero)];
+  if(src) img.src = src;
+  document.getElementById('deposito-ilustracao-label').textContent = `${estagio.label} — ${fmtPctPlain(pct)}`;
+}
+
+function renderDepositoProjecao(){
+  const semanas = depositoData.projecao_ocupacao || [];
+  document.getElementById('deposito-projecao').innerHTML = semanas.map(s=>{
+    const estagio = DEPOSITO_ESTAGIOS.find(e => s.ocupacao_pct < e.max) || DEPOSITO_ESTAGIOS[DEPOSITO_ESTAGIOS.length-1];
+    const src = DEPOSITO_ILUSTRACOES[String(estagio.numero)] || '';
+    const repoNota = s.reposicao_na_semana>0 ? `+${fmtInt.format(s.reposicao_na_semana)} caixas chegando` : '';
+    return `<div class="projecao-card">
+      <span class="projecao-semana">Semana ${s.semana}</span>
+      <img src="${src}" alt="${estagio.label}">
+      <span class="projecao-pct" style="${s.ocupacao_pct>100?'color:var(--crit-ink);':''}">${fmtPctPlain(s.ocupacao_pct)}</span>
+      <p class="projecao-label">${estagio.label}</p>
+      ${repoNota ? `<p class="projecao-repo">${repoNota}</p>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderDepositoMeters(){
+  const resumo = depositoData.resumo || {};
+  const cats = ['pequena','media','grande'].filter(c=>resumo[c]);
+  document.getElementById('deposito-meters').innerHTML = cats.map(c=>{
+    const r = resumo[c];
+    const pctReal = r.capacidade>0 ? r.demanda/r.capacidade*100 : 0;
+    const pctBarra = Math.min(100, pctReal);
+    const cls = pctReal>=100 ? 'crit' : (pctReal>=80 ? 'warn' : '');
+    return `
+      <div class="meter-card">
+        <div class="meter-head">
+          <span class="meter-title">${CATEGORIA_LABEL[c]} <span style="color:var(--text-muted); font-weight:400;">(${r.estantes_dedicadas} estantes)</span></span>
+          <span class="meter-pct" style="${pctReal>=100?'color:var(--crit-ink);':''}">${fmtPctPlain(pctReal)}</span>
+        </div>
+        <div class="meter-track"><div class="meter-fill ${cls}" style="width:${pctBarra}%"></div></div>
+        <div class="meter-foot">
+          <span>${fmtInt.format(r.demanda)} de ${fmtInt.format(r.capacidade)} caixas</span>
+          ${r.excedente>0 ? `<span class="excedente">+${fmtInt.format(r.excedente)} sem espaço</span>` : '<span>tudo cabe</span>'}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderDepositoMapaVisual(){
+  const estantes = depositoData.mapa_estantes || [];
+  const legendCats = ['pequena','media','grande','reservada'];
+  document.getElementById('deposito-legend').innerHTML = legendCats.map(c=>
+    `<span class="wh-legend-item"><span class="wh-legend-swatch" style="background:${CATEGORIA_COR[c]}"></span>${CATEGORIA_LABEL_MAPA[c]}</span>`
+  ).join('');
+
+  const porCorredor = {};
+  estantes.forEach(e=>{ (porCorredor[e.corredor] ||= []).push(e); });
+
+  document.getElementById('deposito-mapa-visual').innerHTML = Object.keys(porCorredor).sort().map(cor=>{
+    const items = porCorredor[cor];
+    const lados = {};
+    items.forEach(e=>{ (lados[e.lado] ||= []).push(e); });
+    const ladoHtml = (label, key) => {
+      const arr = (lados[key]||[]).sort((a,b)=>a.posicao-b.posicao);
+      if(!arr.length) return '';
+      return `<div class="wh-lado"><span class="wh-lado-label">${label}</span>${arr.map(e=>`
+        <button type="button" class="wh-estante${e.estante===depositoEstanteAtual?' selected':''}" style="background:${CATEGORIA_COR[e.categoria]||CATEGORIA_COR.vazia}" onclick="selecionarEstante('${e.estante}')">${e.estante}
+          <span class="wh-tip">${e.estante} — ${CATEGORIA_LABEL_MAPA[e.categoria]||e.categoria}</span>
+        </button>`).join('')}</div>`;
+    };
+    return `<div class="wh-corredor">
+      <span class="wh-corredor-label">Corredor ${cor}</span>
+      <div class="wh-lados">${ladoHtml('Esq','esquerda')}${ladoHtml('Dir','direita')}</div>
+    </div>`;
+  }).join('');
+}
+
+let depositoEstanteAtual = null;
+let depositoAndarAtual = null;
+
+function selecionarEstante(estanteId){
+  depositoEstanteAtual = estanteId;
+  depositoAndarAtual = null;
+  renderDepositoMapaVisual();
+  renderDepositoAndares();
+  renderDepositoSkus();
+}
+
+function selecionarAndar(andarLabel){
+  depositoAndarAtual = andarLabel;
+  renderDepositoAndares();
+  renderDepositoSkus();
+}
+
+function renderDepositoAndares(){
+  const container = document.getElementById('deposito-andares-visual');
+  const titulo = document.getElementById('wh-estante-titulo');
+  if(!depositoEstanteAtual){
+    titulo.textContent = 'Selecione uma estante';
+    container.innerHTML = '<div class="wh-empty-hint">Clique numa estante no mapa à esquerda.</div>';
+    return;
+  }
+  titulo.textContent = `Estante ${depositoEstanteAtual}`;
+  const meta = (depositoData.mapa_estantes||[]).find(e=>e.estante===depositoEstanteAtual);
+  if(meta && meta.categoria==='reservada'){
+    container.innerHTML = '<div class="wh-empty-hint">Reservada pra Feirinha/acessórios — fora deste levantamento.</div>';
+    return;
+  }
+  const andares = (depositoData.estante_andares||{})[depositoEstanteAtual] || [];
+  if(!andares.length){
+    container.innerHTML = '<div class="wh-empty-hint">Sem dados pra essa estante.</div>';
+    return;
+  }
+  const andaresVisual = andares.slice().reverse(); // andar 1 embaixo, topo em cima - igual a prateleira de verdade
+  container.innerHTML = `<div class="wh-estante-detail">${andaresVisual.map(a=>{
+    const pct = a.capacidade>0 ? Math.min(100, a.usado/a.capacidade*100) : 0;
+    const sel = a.andar===depositoAndarAtual ? ' selected' : '';
+    return `<div class="wh-andar-row${sel}" data-andar="${a.andar}">
+      <div class="wh-andar-head"><span>Andar ${a.andar}</span><span>${fmtInt.format(a.usado)}/${fmtInt.format(a.capacidade)}</span></div>
+      <div class="wh-andar-bar"><div class="wh-andar-fill" style="width:${pct}%; background:${CATEGORIA_COR[a.categoria]}"></div></div>
+    </div>`;
+  }).join('')}</div>`;
+  container.querySelectorAll('.wh-andar-row').forEach(el=>{
+    el.addEventListener('click', ()=> selecionarAndar(el.dataset.andar));
+  });
+}
+
+const DEPOSITO_SKU_COLUMNS = [
+  {key:'nome', label:'Produto/Referência', type:'text', cellClass:'', format:r=>productCell(r.nome, r.referencia), sortValue:r=>r.nome},
+  {key:'tamanho', label:'Tamanho/SKU', type:'text', cellClass:'', format:r=>sizeCell(r.tamanho, r.sku), sortValue:r=>r.sku},
+  {key:'unidades', label:'Caixas', type:'number', format:r=>fmtInt.format(r.unidades), sortValue:r=>r.unidades},
+];
+
+function renderDepositoSkus(){
+  const titulo = document.getElementById('wh-andar-titulo');
+  if(!depositoEstanteAtual || !depositoAndarAtual){
+    titulo.textContent = 'Selecione um andar';
+    renderSortableTable('table-deposito-skus', DEPOSITO_SKU_COLUMNS, [], 'Clique num andar pra ver os produtos.');
+    return;
+  }
+  const andares = (depositoData.estante_andares||{})[depositoEstanteAtual] || [];
+  const andar = andares.find(a=>a.andar===depositoAndarAtual);
+  titulo.textContent = `${depositoEstanteAtual} — Andar ${depositoAndarAtual}`;
+  renderSortableTable('table-deposito-skus', DEPOSITO_SKU_COLUMNS, (andar ? andar.skus : []).slice().sort((a,b)=>a.tamanho.localeCompare(b.tamanho)), 'Nenhum produto nesse andar.');
+}
+
+let localizadorRowsCache = null;
+function buildLocalizadorRows(){
+  if(localizadorRowsCache) return localizadorRowsCache;
+  const categoriaPorEstante = {};
+  (depositoData.mapa_estantes||[]).forEach(e=>{ categoriaPorEstante[e.estante] = e.categoria; });
+  const rows = [];
+  Object.entries(depositoData.estante_andares||{}).forEach(([estante, andares])=>{
+    andares.forEach(a=>{
+      (a.skus||[]).forEach(s=>{
+        rows.push({...s, categoria: categoriaPorEstante[estante]||a.categoria, estante, andar: a.andar, semEspaco:false});
+      });
+    });
+  });
+  (depositoData.sem_espaco||[]).forEach(s=>{
+    rows.push({sku:s.sku, tamanho:s.tamanho, referencia:s.referencia, nome:s.nome, categoria:s.categoria, estante:null, andar:null, unidades:s.unidades, semEspaco:true});
+  });
+  localizadorRowsCache = rows;
+  return rows;
+}
+
+const DEPOSITO_LOCALIZADOR_COLUMNS = [
+  {key:'nome', label:'Produto/Referência', type:'text', cellClass:'', format:r=>productCell(r.nome, r.referencia), sortValue:r=>r.nome},
+  {key:'tamanho', label:'Tamanho/SKU', type:'text', cellClass:'', format:r=>sizeCell(r.tamanho, r.sku), sortValue:r=>r.sku},
+  {key:'categoria', label:'Categoria', type:'text', cellClass:'', format:r=>categoriaBadge(r.categoria), sortValue:r=>r.categoria},
+  {key:'corredor', label:'Corredor', type:'text', cellClass:'', format:r=> r.semEspaco ? '—' : r.estante.split('-')[0], sortValue:r=> r.semEspaco ? '' : r.estante.split('-')[0]},
+  {key:'estante', label:'Estante', type:'text', cellClass:'', format:r=> r.semEspaco ? '—' : r.estante, sortValue:r=>r.estante||''},
+  {key:'andar', label:'Andar', type:'text', cellClass:'', format:r=> r.semEspaco ? '<span class="badge badge-crit">Sem espaço</span>' : r.andar, sortValue:r=>r.semEspaco ? -1 : parseInt(r.andar, 10)},
+  {key:'unidades', label:'Caixas', type:'number', format:r=>fmtInt.format(r.unidades), sortValue:r=>r.unidades},
+];
+
+const textFilterLocalizador = document.getElementById('f-text-localizador');
+const categoriaLocalizadorSel = document.getElementById('f-categoria-localizador');
+populaCategoriaSelect(categoriaLocalizadorSel);
+function renderDepositoLocalizador(){
+  const filterText = (textFilterLocalizador.value||'').trim().toLowerCase();
+  let rows = buildLocalizadorRows();
+  rows = rows.filter(r=>matchCategoria(categoriaLocalizadorSel, r.referencia));
+  if(filterText) rows = rows.filter(r=> matchNameOrCode(filterText, r.nome, r.referencia, r.sku));
+  if(!sortState['table-deposito-localizador']) rows = rows.slice().sort((a,b)=> a.nome.localeCompare(b.nome) || a.tamanho.localeCompare(b.tamanho));
+  renderSortableTable('table-deposito-localizador', DEPOSITO_LOCALIZADOR_COLUMNS, rows, 'Nenhum produto encontrado.');
+}
+textFilterLocalizador.addEventListener('input', renderDepositoLocalizador);
+categoriaLocalizadorSel.addEventListener('change', renderDepositoLocalizador);
+attachSort('table-deposito-localizador', renderDepositoLocalizador);
+
+const CLASSE_SAUDE_COR = {critico:'--orange', atencao:'--warn', saudavel:'--good', parado:'--crit'};
+const CLASSE_SAUDE_LABEL = {critico:'Risco de ruptura', atencao:'Atenção', saudavel:'Saudável', parado:'Parado'};
+const CLASSE_SAUDE_BADGE = {critico:'badge-orange', atencao:'badge-b', saudavel:'badge-a', parado:'badge-crit'};
+
+function classeSaudeBadge(classe){
+  return `<span class="badge ${CLASSE_SAUDE_BADGE[classe]||'badge-c'}">${CLASSE_SAUDE_LABEL[classe]||classe}</span>`;
+}
+
+const CLASSE_BLOCO_TOKENS = {
+  critico: {bg:'--orange-bg', ink:'--orange-ink'},
+  atencao: {bg:'--warn-bg', ink:'--warn-ink'},
+  saudavel: {bg:'--good-bg', ink:'--good-ink'},
+  parado: {bg:'--crit-bg', ink:'--crit-ink'},
+};
+
+let depositoTop15Chart = null;
+function renderDepositoSaudeCharts(){
+  if(typeof Chart === 'undefined') return;
+  let rows = depositoData.ranking_espaco || [];
+  rows = rows.filter(r=>matchCategoria(categoriaDepositoSel, r.referencia));
+  const filterText = (textFilterDeposito.value||'').trim().toLowerCase();
+  if(filterText) rows = rows.filter(r=> matchNameOrCode(filterText, r.nome, r.referencia, ''));
+
+  const rootStyle = getComputedStyle(document.documentElement);
+  const corDe = (tok) => rootStyle.getPropertyValue(tok).trim();
+
+  const top15 = rows.slice().sort((a,b)=>b.pct_espaco-a.pct_espaco).slice(0,15);
+  if(depositoTop15Chart) depositoTop15Chart.destroy();
+  const ctx = document.getElementById('chart-deposito-top15');
+  depositoTop15Chart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: top15.map(r=>r.nome),
+      datasets: [{
+        data: top15.map(r=>r.pct_espaco),
+        backgroundColor: top15.map(r=>corDe(CLASSE_SAUDE_COR[r.classe])),
+        borderColor: corDe('--surface-2'),
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, cutout:'55%',
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:(c)=> `${c.label}: ${fmtPctPlain(c.parsed)} do depósito`}},
+      }
+    }
+  });
+
+  const legendEl = document.getElementById('deposito-top15-legend');
+  legendEl.innerHTML = top15.length ? top15.map(r=>
+    `<span class="saude-legend-item"><span class="saude-legend-swatch" style="background:${corDe(CLASSE_SAUDE_COR[r.classe])}"></span>${r.nome}<span class="saude-legend-pct">${fmtPctPlain(r.pct_espaco)}</span></span>`
+  ).join('') : '<span class="saude-legend-item">Nenhum produto encontrado.</span>';
+
+  const porClasse = {};
+  rows.forEach(r=>{
+    if(!porClasse[r.classe]) porClasse[r.classe] = {pct:0, n:0};
+    porClasse[r.classe].pct += r.pct_espaco;
+    porClasse[r.classe].n += 1;
+  });
+  const blocosEl = document.getElementById('deposito-blocos-classe');
+  const classes = Object.keys(CLASSE_SAUDE_COR).filter(c=>porClasse[c] && porClasse[c].n>0);
+  blocosEl.innerHTML = classes.length ? classes.map(c=>{
+    const d = porClasse[c];
+    const tok = CLASSE_BLOCO_TOKENS[c];
+    return `<div class="saude-bloco" style="flex-grow:${Math.max(1,d.pct)}; background:var(${tok.bg}); color:var(${tok.ink});">
+      <span class="saude-bloco-pct">${fmtPctPlain(d.pct)}</span>
+      <span class="saude-bloco-label">${CLASSE_SAUDE_LABEL[c]} · ${d.n} produto${d.n>1?'s':''}</span>
+    </div>`;
+  }).join('') : '<div class="saude-bloco" style="color:var(--text-muted);">Nenhum produto encontrado.</div>';
+
+  const kpisEl = document.getElementById('deposito-saude-kpis');
+  if(top15.length){
+    const somaTop15 = top15.reduce((s,r)=>s+r.pct_espaco,0);
+    let classePredominante = classes[0], maxPct = -1;
+    classes.forEach(c=>{ if(porClasse[c].pct>maxPct){ maxPct=porClasse[c].pct; classePredominante=c; } });
+    kpisEl.innerHTML = `
+      <div class="kpi"><p class="label">Referências analisadas</p><p class="value">${fmtInt.format(rows.length)}</p><span class="delta flat">no filtro atual</span></div>
+      <div class="kpi"><p class="label">Maior ocupante</p><p class="value">${fmtPctPlain(top15[0].pct_espaco)}</p><span class="delta flat">${top15[0].nome}</span></div>
+      <div class="kpi"><p class="label">Top 15 somam</p><p class="value">${fmtPctPlain(somaTop15)}</p><span class="delta flat">do depósito</span></div>
+      <div class="kpi"><p class="label">Classe predominante</p><p class="value">${CLASSE_SAUDE_LABEL[classePredominante]||'—'}</p><span class="delta flat">${fmtPctPlain(maxPct)} do depósito</span></div>
+    `;
+  } else {
+    kpisEl.innerHTML = '<div class="kpi"><p class="label">Referências analisadas</p><p class="value">0</p></div>';
+  }
+}
+
+const DEPOSITO_RANKING_COLUMNS = [
+  {key:'nome', label:'Produto/Referência', type:'text', cellClass:'', format:r=>productCell(r.nome, r.referencia), sortValue:r=>r.nome},
+  {key:'categoria', label:'Categoria', type:'text', cellClass:'', format:r=>categoriaBadge(r.categoria), sortValue:r=>r.categoria},
+  {key:'caixas', label:'Caixas', type:'number', format:r=>fmtInt.format(r.caixas), sortValue:r=>r.caixas},
+  {key:'pct_espaco', label:'% do Depósito', type:'number', format:r=>fmtPctPlain(r.pct_espaco), sortValue:r=>r.pct_espaco},
+  {key:'velocidade', label:'Vendas (60d)', type:'number', format:r=>fmtInt.format(r.velocidade), sortValue:r=>r.velocidade},
+  {key:'reposicao_qtd', label:'Reposição', type:'number', format:r=> r.reposicao_qtd>0 ? fmtInt.format(r.reposicao_qtd) : '—', sortValue:r=>r.reposicao_qtd},
+  {key:'cobertura_dias', label:'Até zerar', type:'number', format:r=> r.cobertura_dias!=null ? `${fmtInt.format(r.cobertura_dias)}d` : '—', sortValue:r=> r.cobertura_dias ?? Infinity},
+  {key:'classe', label:'Classificação', type:'text', cellClass:'center', format:r=>classeSaudeBadge(r.classe), sortValue:r=>r.classe},
+];
+
+const categoriaDepositoSel = document.getElementById('f-categoria-deposito');
+populaCategoriaSelect(categoriaDepositoSel);
+const textFilterDeposito = document.getElementById('f-text-deposito');
+
+function renderDeposito(){
+  const resumo = depositoData.resumo || {};
+  const resumoRows = ['pequena','media','grande'].filter(c=>resumo[c]).map(c=>({categoria:c, ...resumo[c]}));
+  renderDepositoMeters();
+  renderDepositoProjecao();
+  renderDepositoMapaVisual();
+  renderDepositoLocalizador();
+  renderDepositoSaudeCharts();
+
+  const totalDemanda = resumoRows.reduce((s,r)=>s+r.demanda,0);
+  const totalCapacidade = resumoRows.reduce((s,r)=>s+r.capacidade,0);
+  const totalExcedente = resumoRows.reduce((s,r)=>s+r.excedente,0);
+  const ocupacaoGeral = totalCapacidade>0 ? totalDemanda/totalCapacidade*100 : 0;
+  renderDepositoIlustracao(ocupacaoGeral);
+  let ocupacaoNota;
+  if(ocupacaoGeral > 100) ocupacaoNota = `estourando em ${fmtPctPlain(ocupacaoGeral-100)}`;
+  else if(ocupacaoGeral >= 80) ocupacaoNota = 'quase lotado';
+  else ocupacaoNota = 'da capacidade dedicada';
+  document.getElementById('deposito-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Estoque físico total</p><p class="value">${fmtInt.format(totalDemanda)}</p><span class="delta flat">caixas de calçado no depósito</span></div>
+    <div class="kpi"><p class="label">Capacidade das estantes</p><p class="value">${fmtInt.format(totalCapacidade)}</p><span class="delta flat">somando as estantes dedicadas a cada categoria</span></div>
+    <div class="kpi"><p class="label">Ocupação</p><p class="value" style="${ocupacaoGeral>100?'color:var(--crit-ink);':''}">${fmtPctPlain(ocupacaoGeral)}</p><span class="delta ${ocupacaoGeral>=80?'down':'flat'}">${ocupacaoNota}</span></div>
+    <div class="kpi"><p class="label">Sem espaço disponível</p><p class="value">${fmtInt.format(totalExcedente)}</p><span class="delta ${totalExcedente>0?'down':'flat'}">caixas sem prateleira disponível</span></div>
+  `;
+
+  const filterText = (textFilterDeposito.value||'').trim().toLowerCase();
+  let rankingRows = depositoData.ranking_espaco || [];
+  rankingRows = rankingRows.filter(r=>matchCategoria(categoriaDepositoSel, r.referencia));
+  if(filterText) rankingRows = rankingRows.filter(r=> matchNameOrCode(filterText, r.nome, r.referencia, ''));
+  renderSortableTable('table-deposito-ranking', DEPOSITO_RANKING_COLUMNS, rankingRows);
+}
+categoriaDepositoSel.addEventListener('change', renderDeposito);
+textFilterDeposito.addEventListener('input', renderDeposito);
+attachSort('table-deposito-skus', renderDepositoSkus);
+attachSort('table-deposito-ranking', renderDeposito);
+
+/* ---------------- EXPEDIÇÃO ---------------- */
+
+const expedicaoData = DATA.expedicao || {};
+
+const EXP_ESTAGIO_LABEL = {
+  recebido:'Recebido', confirmado:'Confirmado', integrado_tiny:'Integrado no Tiny', nf_gerada:'NF gerada',
+  separado:'Separado p/ envio', enviado:'Enviado', entregue:'Entregue', cancelado:'Cancelado', nao_entregue:'Não entregue',
+};
+const EXP_ESTAGIO_BADGE = {
+  recebido:'badge-c', confirmado:'badge-b', integrado_tiny:'badge-b', nf_gerada:'badge-b', separado:'badge-b',
+  enviado:'badge-accent', entregue:'badge-a', cancelado:'badge-crit', nao_entregue:'badge-orange',
+};
+const TINY_SITUACAO_LABEL = {
+  aberta:'Aberta', aprovada:'Aprovada', dados_incompletos:'Dados incompletos', faturada:'Faturada',
+  preparando_envio:'Preparando envio', pronto_envio:'Pronto p/ envio', enviada:'Enviada', entregue:'Entregue',
+  cancelada:'Cancelada', nao_entregue:'Não entregue',
+};
+function expEstagioBadge(estagio, atrasado){
+  const base = `<span class="badge ${EXP_ESTAGIO_BADGE[estagio]||'badge-c'}">${EXP_ESTAGIO_LABEL[estagio]||estagio}</span>`;
+  return atrasado ? base + ' <span class="badge badge-orange">Atrasado</span>' : base;
+}
+function fmtHorasOuMin(h){
+  if(h==null) return '—';
+  if(h < 1) return `${Math.round(h*60)} min`;
+  return `${h.toFixed(1).replace('.', ',')} h`;
+}
+function fmtDiasExp(d){
+  return d!=null ? `${d.toFixed(1).replace('.', ',')} dias` : '—';
+}
+
+const EXPEDICAO_PEDIDOS_COLUMNS = [
+  {key:'code', label:'Pedido', type:'text', format:r=>r.code, sortValue:r=>r.code},
+  {key:'data', label:'Data', type:'text', format:r=>r.data.split('-').reverse().join('/'), sortValue:r=>r.data},
+  {key:'email', label:'Cliente', type:'text', format:r=>r.email||'—', sortValue:r=>r.email||''},
+  {key:'estagio', label:'Status', type:'text', cellClass:'center', format:r=>expEstagioBadge(r.estagio, r.atrasado), sortValue:r=>r.estagio},
+  {key:'situacao_tiny', label:'Situação no Tiny', type:'text', format:r=> r.situacao_tiny ? (TINY_SITUACAO_LABEL[r.situacao_tiny]||r.situacao_tiny) : '—', sortValue:r=>r.situacao_tiny||''},
+  {key:'transportadora', label:'Transportadora', type:'text', format:r=>r.transportadora, sortValue:r=>r.transportadora},
+  {key:'previsao_entrega', label:'Previsão de entrega', type:'text', format:r=> r.previsao_entrega ? r.previsao_entrega.split('-').reverse().join('/') : '—', sortValue:r=>r.previsao_entrega||''},
+  {key:'total', label:'Valor', type:'number', format:r=>fmtBRL.format(r.total), sortValue:r=>r.total},
+];
+
+const EXPEDICAO_TRANSPORTADORA_COLUMNS = [
+  {key:'transportadora', label:'Transportadora', type:'text', format:r=>r.transportadora, sortValue:r=>r.transportadora},
+  {key:'pedidos', label:'Pedidos', type:'number', format:r=>fmtInt.format(r.pedidos), sortValue:r=>r.pedidos},
+  {key:'prazo_medio_dias', label:'Prazo médio até entrega', type:'number', format:r=>fmtDiasExp(r.prazo_medio_dias), sortValue:r=> r.prazo_medio_dias ?? Infinity},
+];
+
+function renderExpedicaoFluxo(){
+  const funil = expedicaoData.funil || {};
+  const tinyOk = expedicaoData.tiny_disponivel;
+  const recebidoConfirmado = (funil.recebido||0) + (funil.confirmado||0);
+  const steps = [
+    {label:'Recebido e confirmado na VNDA', value: fmtInt.format(recebidoConfirmado), disabled:false},
+    {label:'Integração no Tiny', value: tinyOk ? fmtInt.format(funil.integrado_tiny||0) : 'Sem integração', disabled:!tinyOk},
+    {label:'Nota fiscal gerada', value: tinyOk ? fmtInt.format(funil.nf_gerada||0) : 'Sem integração', disabled:!tinyOk},
+    {label:'Separado para envio', value: tinyOk ? fmtInt.format(funil.separado||0) : 'Sem integração', disabled:!tinyOk},
+    {label:'Enviado', value: fmtInt.format(funil.enviado||0), disabled:false},
+    {label:'Entregue', value: fmtInt.format(funil.entregue||0), disabled:false},
+  ];
+  document.getElementById('expedicao-fluxo').innerHTML = steps.map((s,i)=>{
+    const box = `<div class="exp-step${s.disabled?' disabled':''}">
+      <span class="exp-step-label">${s.label}</span>
+      <span class="exp-step-value">${s.value}</span>
+      ${s.disabled ? '<span class="exp-step-hint">sem integração ainda</span>' : ''}
+    </div>`;
+    return i>0 ? `<div class="exp-arrow">&#8594;</div>${box}` : box;
+  }).join('');
+
+  const cancelados = funil.cancelado||0;
+  const naoEntregues = funil.nao_entregue||0;
+  const totalGeral = Object.values(funil).reduce((a,b)=>a+b,0) || 1;
+  const branchEl = document.getElementById('expedicao-cancelados');
+  const branchParts = [];
+  if(cancelados>0){
+    branchParts.push(`<span>Cancelados:</span> <b>${fmtInt.format(cancelados)}</b> <span>(${fmtPctPlain(cancelados/totalGeral*100)} do total)</span>`);
+  }
+  if(naoEntregues>0){
+    branchParts.push(`<span>Não entregues:</span> <b>${fmtInt.format(naoEntregues)}</b> <span>(tentativa de entrega falhou, precisa de ação)</span>`);
+  }
+  if(branchParts.length){
+    branchEl.style.display = '';
+    branchEl.innerHTML = branchParts.join(' &nbsp;·&nbsp; ');
+  } else {
+    branchEl.style.display = 'none';
+  }
+}
+
+const estagioExpedicaoSel = document.getElementById('f-estagio-expedicao');
+const textFilterExpedicao = document.getElementById('f-text-expedicao');
+
+function renderExpedicaoPedidos(){
+  const estVal = estagioExpedicaoSel.value;
+  const filterText = (textFilterExpedicao.value||'').trim().toLowerCase();
+  let rows = expedicaoData.pedidos || [];
+  if(estVal==='atrasado') rows = rows.filter(r=>r.atrasado);
+  else if(estVal!=='all') rows = rows.filter(r=>r.estagio===estVal);
+  if(filterText) rows = rows.filter(r=> matchNameOrCode(filterText, r.email, r.code));
+  if(!sortState['table-expedicao-pedidos']) rows = rows.slice().sort((a,b)=> b.data.localeCompare(a.data));
+  renderSortableTable('table-expedicao-pedidos', EXPEDICAO_PEDIDOS_COLUMNS, rows, 'Nenhum pedido encontrado.');
+}
+estagioExpedicaoSel.addEventListener('change', renderExpedicaoPedidos);
+textFilterExpedicao.addEventListener('input', renderExpedicaoPedidos);
+attachSort('table-expedicao-pedidos', renderExpedicaoPedidos);
+
+function renderExpedicaoTransportadora(){
+  const rows = expedicaoData.por_transportadora || [];
+  renderSortableTable('table-expedicao-transportadora', EXPEDICAO_TRANSPORTADORA_COLUMNS, rows, 'Sem dados no período.');
+}
+attachSort('table-expedicao-transportadora', renderExpedicaoTransportadora);
+
+function renderExpedicao(){
+  if(!expedicaoData.pedidos || !expedicaoData.pedidos.length){
+    document.getElementById('expedicao-janela-footnote').textContent = 'Ainda não há dados de expedição sincronizados.';
+    return;
+  }
+  document.getElementById('expedicao-janela-footnote').textContent =
+    `Últimos ${expedicaoData.janela_dias} dias · atualizado em ${(expedicaoData.atualizado_em||'').replace('T',' ')}`;
+  document.getElementById('expedicao-janela-dias').textContent = expedicaoData.janela_dias;
+  document.getElementById('expedicao-fluxo-footnote').textContent = expedicaoData.tiny_disponivel
+    ? 'Cada etapa mostra quantos pedidos estão parados ali agora, do recebimento na VNDA até a entrega — integração e nota fiscal via Tiny.'
+    : 'Da confirmação na VNDA até a entrega. A integração com o Tiny está indisponível no momento (token expirado ou API fora do ar) — por isso as etapas de integração e nota fiscal aparecem sem número.';
+  renderExpedicaoFluxo();
+
+  const funil = expedicaoData.funil || {};
+  const total = expedicaoData.pedidos.length;
+  const cancelados = funil.cancelado||0;
+  const taxaCancel = total>0 ? cancelados/total*100 : 0;
+  document.getElementById('expedicao-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Pedidos no período</p><p class="value">${fmtInt.format(total)}</p><span class="delta flat">últimos ${expedicaoData.janela_dias} dias</span></div>
+    <div class="kpi"><p class="label">Tempo médio de confirmação</p><p class="value">${fmtHorasOuMin(expedicaoData.tempo_medio_confirmacao_horas)}</p><span class="delta flat">recebido até confirmado</span></div>
+    ${expedicaoData.tiny_disponivel ? `<div class="kpi"><p class="label">Tempo médio até integrar no Tiny</p><p class="value">${fmtDiasExp(expedicaoData.tempo_medio_integracao_tiny_dias)}</p><span class="delta flat">recebido até aparecer no Tiny</span></div>` : ''}
+    <div class="kpi"><p class="label">Tempo médio até entrega</p><p class="value">${fmtDiasExp(expedicaoData.tempo_medio_entrega_dias)}</p><span class="delta flat">confirmado até entregue</span></div>
+    <div class="kpi"><p class="label">Pedidos atrasados</p><p class="value" style="${expedicaoData.atrasados>0?'color:var(--crit-ink);':''}">${fmtInt.format(expedicaoData.atrasados)}</p><span class="delta ${expedicaoData.atrasados>0?'down':'flat'}">passaram da previsão de entrega</span></div>
+    <div class="kpi"><p class="label">Taxa de cancelamento</p><p class="value">${fmtPctPlain(taxaCancel)}</p><span class="delta flat">do período</span></div>
+  `;
+
+  renderExpedicaoPedidos();
+  renderExpedicaoTransportadora();
+}
+
+/* ---------------- INIT ---------------- */
+function safeRun(fn, label){
+  try{ fn(); }
+  catch(err){ console.error('Falha ao inicializar ' + label + ':', err); }
+}
+safeRun(renderPadroes, 'aba Padrões');
+safeRun(render, 'aba Curva ABC');
+safeRun(renderEstoque, 'aba Estoque por dia');
+safeRun(renderDesconto, 'aba Descontos por dia');
+safeRun(renderCrossSell, 'aba Venda Cruzada');
+safeRun(renderAviseMe, 'aba Avise-me');
+safeRun(renderReposicoes, 'aba Reposições');
+safeRun(renderCompras, 'aba Compras');
+safeRun(renderDeposito, 'aba Depósito');
+safeRun(renderExpedicao, 'aba Expedição');
+
+/* Tooltips (.infotip) usam position:fixed calculado via JS pra nao serem cortados
+   por containers de tabela com overflow (ex: dentro de <thead> com scroll). */
+/* Delegado no document (nao querySelectorAll+listener direto) porque tabelas
+   recriam o HTML a cada render e teriam infotips sem listener se fosse direto. */
+function positionInfotip(icon){
+  const box = icon.querySelector('.tooltip-box');
+  if(!box) return;
+  box.style.transform = 'none';
+  box.style.display = 'block';
+  box.style.left = '0px';
+  box.style.top = '0px';
+  const r = icon.getBoundingClientRect();
+  const boxRect = box.getBoundingClientRect();
+  let left = r.left + r.width/2 - boxRect.width/2;
+  left = Math.max(8, Math.min(left, window.innerWidth - boxRect.width - 8));
+  let top = r.top - boxRect.height - 6;
+  if(top < 8) top = r.bottom + 6;
+  box.style.left = left + 'px';
+  box.style.top = top + 'px';
+}
+function hideInfotip(icon){
+  const box = icon.querySelector('.tooltip-box');
+  if(box) box.style.display = 'none';
+}
+document.addEventListener('mouseover', e=>{
+  const icon = e.target.closest('.infotip');
+  if(icon && !icon.contains(e.relatedTarget)) positionInfotip(icon);
+});
+document.addEventListener('mouseout', e=>{
+  const icon = e.target.closest('.infotip');
+  if(icon && !icon.contains(e.relatedTarget)) hideInfotip(icon);
+});
+document.addEventListener('focusin', e=>{
+  const icon = e.target.closest('.infotip');
+  if(icon) positionInfotip(icon);
+});
+document.addEventListener('focusout', e=>{
+  const icon = e.target.closest('.infotip');
+  if(icon) hideInfotip(icon);
+});
+</script>

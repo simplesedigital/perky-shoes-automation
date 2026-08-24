@@ -1,0 +1,21 @@
+# Allowlist: por padrao, tudo fica de fora do repositorio (dados de clientes,
+# credenciais, historico de vendas/estoque, rascunhos etc). So o que e
+# explicitamente liberado abaixo entra no git. Nunca inverta essa logica pra
+# um blocklist - essa pasta tem dezenas de arquivos soltos e um blocklist e
+# facil de esquecer algo sensivel.
+*
+
+!.gitignore
+!requirements.txt
+
+!dashboard_lib.py
+!atualizacao_diaria.py
+!sincronizar_pedidos.py
+!sincronizar_planilhas.py
+
+!dashboard_template.html
+!chart.umd.js
+
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
