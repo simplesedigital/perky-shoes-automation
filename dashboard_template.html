@@ -499,45 +499,31 @@ tbody tr:last-child td{border-bottom:none;}
   <p class="footnote" style="margin-top:-6px;">Cruza visualizações da página do produto (GA4) com taxa de conversão (unidades vendidas ÷ views) no período selecionado. "Muitas/poucas views" e "alta/baixa conversão" são definidos pela média entre os produtos vendidos no período — não um valor fixo.</p>
   <div class="quad-grid" id="quad-grid"></div>
 
-  <div class="section-title">Ranking por receita</div>
+  <div class="section-title">Ranking de produtos</div>
   <div class="controls-row">
-    <div class="seg" id="seg-gran-receita">
+    <div class="seg" id="seg-chart-metric">
+      <button aria-pressed="true" data-v="revenue">Receita</button>
+      <button aria-pressed="false" data-v="quantity">Unidades</button>
+      <button aria-pressed="false" data-v="views">Views</button>
+      <button aria-pressed="false" data-v="conversion">Conversão</button>
+    </div>
+    <div class="seg" id="seg-gran-produtos">
       <button aria-pressed="true" data-v="day">Dia</button>
       <button aria-pressed="false" data-v="week">Semana</button>
       <button aria-pressed="false" data-v="month">Mês</button>
     </div>
-    <div class="seg" id="seg-topn-receita">
+    <div class="seg" id="seg-topn-produtos">
       <button aria-pressed="true" data-v="5">Top 5</button>
       <button aria-pressed="false" data-v="10">Top 10</button>
       <button aria-pressed="false" data-v="15">Top 15</button>
       <button aria-pressed="false" data-v="20">Top 20</button>
     </div>
   </div>
-  <div class="legend" id="legend-receita"></div>
-  <div class="chartwrap" id="chartwrap-receita"><canvas id="chart-receita" role="img" aria-label="Evolução de receita dos produtos mais vendidos"></canvas></div>
-  <div class="emptystate" id="chart-fallback-receita" style="display:none;">Não foi possível carregar o gráfico (biblioteca de gráficos indisponível). As tabelas abaixo continuam funcionando normalmente.</div>
-  <div class="sparkgrid" id="sparkgrid-receita" style="display:none;"></div>
-  <div class="tablewrap maxh"><table id="table-receita"><thead></thead><tbody></tbody></table></div>
-
-  <div class="section-title">Ranking por quantidade</div>
-  <div class="controls-row">
-    <div class="seg" id="seg-gran-qtd">
-      <button aria-pressed="true" data-v="day">Dia</button>
-      <button aria-pressed="false" data-v="week">Semana</button>
-      <button aria-pressed="false" data-v="month">Mês</button>
-    </div>
-    <div class="seg" id="seg-topn-qtd">
-      <button aria-pressed="true" data-v="5">Top 5</button>
-      <button aria-pressed="false" data-v="10">Top 10</button>
-      <button aria-pressed="false" data-v="15">Top 15</button>
-      <button aria-pressed="false" data-v="20">Top 20</button>
-    </div>
-  </div>
-  <div class="legend" id="legend-qtd"></div>
-  <div class="chartwrap" id="chartwrap-qtd"><canvas id="chart-qtd" role="img" aria-label="Evolução de quantidade vendida dos produtos mais vendidos"></canvas></div>
-  <div class="emptystate" id="chart-fallback-qtd" style="display:none;">Não foi possível carregar o gráfico (biblioteca de gráficos indisponível). As tabelas abaixo continuam funcionando normalmente.</div>
-  <div class="sparkgrid" id="sparkgrid-qtd" style="display:none;"></div>
-  <div class="tablewrap maxh"><table id="table-qtd"><thead></thead><tbody></tbody></table></div>
+  <div class="legend" id="legend-produtos"></div>
+  <div class="chartwrap" id="chartwrap-produtos"><canvas id="chart-produtos" role="img" aria-label="Evolução da métrica selecionada por produto"></canvas></div>
+  <div class="emptystate" id="chart-fallback-produtos" style="display:none;">Não foi possível carregar o gráfico (biblioteca de gráficos indisponível). A tabela abaixo continua funcionando normalmente.</div>
+  <div class="sparkgrid" id="sparkgrid-produtos" style="display:none;"></div>
+  <div class="tablewrap maxh"><table id="table-produtos"><thead></thead><tbody></tbody></table></div>
 
   <p class="footnote">Classe A = até 80% da receita/quantidade acumulada · B = até 95% · C = restante. Tendência compara com o período anterior de mesma duração.</p>
 </div>
@@ -1376,8 +1362,8 @@ function aggregateByRef(rows){
   return m;
 }
 
-let granReceita='day', topnReceita=5, granQtd='day', topnQtd=5;
-let chartReceita=null, chartQtd=null;
+let granProdutos='day', topnProdutos=5, chartMetric='revenue';
+let chartProdutos=null;
 
 function seg(id, onChange){
   const el = document.getElementById(id);
@@ -1467,18 +1453,16 @@ document.getElementById('pin-checkbox').addEventListener('change', e=>applyPin(e
   applyPin(savedPin || 'off', false);
 })();
 
-seg('seg-gran-receita', v=>{granReceita=v; render();});
-seg('seg-topn-receita', v=>{topnReceita=+v; render();});
-seg('seg-gran-qtd', v=>{granQtd=v; render();});
-seg('seg-topn-qtd', v=>{topnQtd=+v; render();});
+seg('seg-chart-metric', v=>{chartMetric=v; render();});
+seg('seg-gran-produtos', v=>{granProdutos=v; render();});
+seg('seg-topn-produtos', v=>{topnProdutos=+v; render();});
 [startInput,endInput,statusSelect].forEach(el=>el.addEventListener('change', render));
 const textFilterAbc = document.getElementById('f-text-abc');
 textFilterAbc.addEventListener('input', render);
 const categoriaAbcSel = document.getElementById('f-categoria-abc');
 populaCategoriaSelect(categoriaAbcSel);
 categoriaAbcSel.addEventListener('change', render);
-attachSort('table-receita', render);
-attachSort('table-qtd', render);
+attachSort('table-produtos', render);
 
 const SERIES = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
 function seriesColor(i){
@@ -1589,34 +1573,34 @@ function renderKPIs(filterText){
     `Comparando com ${r.prevStart} a ${r.prevEnd} (${r.dur} dias)`;
 }
 
-function renderTable(tableId, entries, metricKey){
+function renderTable(tableId, entries){
   const table = document.getElementById(tableId);
-  const metricLabel = metricKey==='revenue' ? 'Receita' : 'Unidades';
   table.querySelector('thead').innerHTML = `<tr>
     ${th(tableId,'rank','#','number')}
     ${th(tableId,'classe','Classe','text')}
     ${th(tableId,'name','Produto/Referência','text')}
-    ${th(tableId,'value',metricLabel,'number','num')}
+    ${th(tableId,'revenue','Receita','number','num')}
+    ${th(tableId,'qty','Unidades','number','num')}
     ${th(tableId,'cumPct','% acum.','number','num')}
     ${th(tableId,'siteShare','% do site','number','num')}
     ${th(tableId,'views','Views','number','num')}
     ${th(tableId,'conversion','Conversão','number','num')}
-    ${th(tableId,'trend','Tendência<span class="infotip" tabindex="0" role="img" aria-label="Compara o valor deste produto no período selecionado com o período anterior de mesma duração. Setas indicam alta ou queda de mais de 0,5%; novo significa que o produto não teve vendas no período anterior.">i<span class="tooltip-box">Compara o valor deste produto no período selecionado com o período anterior de mesma duração (ex: últimos 30 dias vs. os 30 dias antes disso). Setas indicam alta ou queda de mais de 0,5%; <b>novo</b> significa que o produto não teve vendas no período anterior.</span></span>','number','num')}
+    ${th(tableId,'trend','Tendência<span class="infotip" tabindex="0" role="img" aria-label="Compara a receita deste produto no período selecionado com o período anterior de mesma duração. Setas indicam alta ou queda de mais de 0,5%; novo significa que o produto não teve vendas no período anterior.">i<span class="tooltip-box">Compara a receita deste produto no período selecionado com o período anterior de mesma duração (ex: últimos 30 dias vs. os 30 dias antes disso). Setas indicam alta ou queda de mais de 0,5%; <b>novo</b> significa que o produto não teve vendas no período anterior.</span></span>','number','num')}
   </tr>`;
   const tbody = table.querySelector('tbody');
   if(entries.length===0){
-    tbody.innerHTML = `<tr><td colspan="9"><div class="emptystate">Nenhum produto encontrado.</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10"><div class="emptystate">Nenhum produto encontrado.</div></td></tr>`;
     return;
   }
   const rows = applySort(entries, sortState[tableId], {
-    rank: e=>e.rank, classe: e=>e.classe, name: e=>e.name, value: e=>e.value,
+    rank: e=>e.rank, classe: e=>e.classe, name: e=>e.name,
+    revenue: e=>e.value, qty: e=>e.qty||0,
     cumPct: e=>e.cumPct, siteShare: e=>e.siteShare,
     views: e=>e.views||0, conversion: e=> e.conversion==null ? -Infinity : e.conversion,
     trend: e=> e.trend===null ? -Infinity : (e.trend===Infinity ? Infinity : e.trend)
   });
   tbody.innerHTML = rows.map(e=>{
     const badgeClass = e.classe==='A'?'badge-a':(e.classe==='B'?'badge-b':'badge-c');
-    const metricStr = metricKey==='revenue' ? fmtBRL.format(e.value) : fmtInt.format(e.value);
     let trendStr, trendCls;
     if(e.trend===null){ trendStr='—'; trendCls='trend-flat'; }
     else if(e.trend===Infinity){ trendStr='novo'; trendCls='trend-up'; }
@@ -1625,7 +1609,8 @@ function renderTable(tableId, entries, metricKey){
       <td class="num">${e.rank}</td>
       <td><span class="badge ${badgeClass}">${e.classe}</span></td>
       <td>${productCell(e.name, e.ref)}</td>
-      <td class="num">${metricStr}</td>
+      <td class="num">${fmtBRL.format(e.value)}</td>
+      <td class="num">${fmtInt.format(e.qty||0)}</td>
       <td class="num">${fmtPctPlain(e.cumPct)}</td>
       <td class="num">${fmtPctPlain(e.siteShare)}</td>
       <td class="num">${e.views ? fmtInt.format(e.views) : '—'}</td>
@@ -1650,23 +1635,56 @@ function bucketRows(rows, gran){
   return m;
 }
 
-function renderChart(canvasId, chartVarSetter, chartVar, legendId, sparkId, chartwrapId, entries, metricKey, gran, topn, status){
+function bucketPageviews(rows, gran){
+  const key = gran==='day' ? (d=>d) : (gran==='week' ? isoWeekStart : monthKey);
+  const m = new Map();
+  for(const [ref, date, views] of rows){
+    const bk = key(date);
+    if(!m.has(bk)) m.set(bk, new Map());
+    const refm = m.get(bk);
+    refm.set(ref, (refm.get(ref)||0) + views);
+  }
+  return m;
+}
+
+const METRIC_LABELS = {revenue:'Receita', quantity:'Unidades', views:'Views', conversion:'Conversão'};
+function metricFormat(metric, v){
+  if(v==null) return '—';
+  if(metric==='revenue') return fmtBRL.format(v);
+  if(metric==='conversion') return fmtPctPlain(v);
+  return fmtInt.format(v);
+}
+
+function renderProductChart(sortedEntries, metric, gran, topn, status){
   if(typeof Chart === 'undefined'){
     throw new Error('Chart.js não carregou');
   }
   const start = startInput.value, end = endInput.value;
-  const topRefs = entries.slice(0, topn).map(e=>e.ref);
-  const rows = filteredRows(start, end, status);
-  const bucketed = bucketRows(rows, gran);
-  const bucketKeys = Array.from(bucketed.keys()).sort();
+  const topRefs = sortedEntries.slice(0, topn).map(e=>e.ref);
 
-  const legendEl = document.getElementById(legendId);
-  const sparkEl = document.getElementById(sparkId);
-  const wrapEl = document.getElementById(chartwrapId);
+  const legendEl = document.getElementById('legend-produtos');
+  const sparkEl = document.getElementById('sparkgrid-produtos');
+  const wrapEl = document.getElementById('chartwrap-produtos');
 
   if(topRefs.length===0){
     legendEl.innerHTML=''; wrapEl.style.display='none'; sparkEl.style.display='none';
     return;
+  }
+
+  const bucketedSales = bucketRows(filteredRows(start, end, status), gran);
+  const pvRowsInRange = pageviewsRows.filter(r=> r[1]>=start && r[1]<=end);
+  const bucketedViews = bucketPageviews(pvRowsInRange, gran);
+  const bucketKeys = Array.from(new Set([...bucketedSales.keys(), ...bucketedViews.keys()])).sort();
+
+  function valueAt(bk, ref){
+    const so = bucketedSales.get(bk) && bucketedSales.get(bk).get(ref);
+    const qty = so ? so.qty : 0;
+    const rev = so ? so.revenue : 0;
+    const views = (bucketedViews.get(bk) && bucketedViews.get(bk).get(ref)) || 0;
+    if(metric==='revenue') return rev;
+    if(metric==='quantity') return qty;
+    if(metric==='views') return views;
+    return views>0 ? qty/views*100 : null;
   }
 
   sparkEl.style.display='none'; sparkEl.innerHTML='';
@@ -1674,15 +1692,13 @@ function renderChart(canvasId, chartVarSetter, chartVar, legendId, sparkId, char
   legendEl.innerHTML = topRefs.map((ref,i)=>`<span class="sw"><span class="dot" style="background:${seriesColor(i)}"></span>${ref}</span>`).join('');
   const datasets = topRefs.map((ref,i)=>({
     label: ref,
-    data: bucketKeys.map(bk=>{
-      const o = bucketed.get(bk).get(ref);
-      return o ? (metricKey==='revenue'?o.revenue:o.qty) : 0;
-    }),
+    data: bucketKeys.map(bk=>valueAt(bk, ref)),
+    spanGaps: true,
     borderColor: seriesColor(i), backgroundColor: seriesColor(i),
     borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15,
   }));
-  if(chartVar) chartVar.destroy();
-  const ctx = document.getElementById(canvasId);
+  if(chartProdutos) chartProdutos.destroy();
+  const ctx = document.getElementById('chart-produtos');
   const newChart = new Chart(ctx, {
     type:'line',
     data:{ labels: bucketKeys, datasets },
@@ -1697,7 +1713,7 @@ function renderChart(canvasId, chartVarSetter, chartVar, legendId, sparkId, char
           return sorted.indexOf(item) < 8;
         },
         callbacks:{
-          label:(c)=> c.dataset.label+': '+(metricKey==='revenue'?fmtBRL.format(c.parsed.y):fmtInt.format(c.parsed.y)),
+          label:(c)=> c.dataset.label+': '+metricFormat(metric, c.parsed.y),
           footer:(items)=>{
             const hidden = topRefs.length - items.length;
             return hidden>0 ? `+ ${hidden} outros produtos nesse ponto` : '';
@@ -1707,11 +1723,11 @@ function renderChart(canvasId, chartVarSetter, chartVar, legendId, sparkId, char
       scales:{
         x:{grid:{display:false}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted'), maxRotation:0, autoSkip:true}},
         y:{grid:{color:getComputedStyle(document.documentElement).getPropertyValue('--grid')}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted'),
-          callback:(v)=> metricKey==='revenue' ? fmtBRL.format(v) : fmtInt.format(v)}}
+          callback:(v)=> metricFormat(metric, v)}}
       }
     }
   });
-  chartVarSetter(newChart);
+  chartProdutos = newChart;
 }
 
 const QUAD_DEFS = [
@@ -1759,36 +1775,33 @@ function render(){
   const status = statusSelect.value;
   const r = buildRanking('revenue', filterText);
   const q = buildRanking('quantity', filterText);
+  const entries = r.entries;
 
   const viewsByRef = viewsByRefForRange(startInput.value, endInput.value);
   const qtyByRef = new Map(q.entries.map(e=>[e.ref, e.value]));
-  function attachViewsConv(entries){
-    entries.forEach(e=>{
-      const views = viewsByRef.get(e.ref) || 0;
-      const qty = qtyByRef.get(e.ref) || 0;
-      e.views = views;
-      e.conversion = views>0 ? qty/views*100 : null;
-    });
-  }
-  attachViewsConv(r.entries);
-  attachViewsConv(q.entries);
-  renderViewsQuadrants(q.entries);
+  entries.forEach(e=>{
+    const views = viewsByRef.get(e.ref) || 0;
+    e.qty = qtyByRef.get(e.ref) || 0;
+    e.views = views;
+    e.conversion = views>0 ? e.qty/views*100 : null;
+  });
+  renderViewsQuadrants(entries);
+  renderTable('table-produtos', entries);
 
-  renderTable('table-receita', r.entries, 'revenue');
-  renderTable('table-qtd', q.entries, 'quantity');
   try{
-    document.getElementById('chart-fallback-receita').style.display='none';
-    document.getElementById('chart-fallback-qtd').style.display='none';
-    renderChart('chart-receita', c=>chartReceita=c, chartReceita, 'legend-receita','sparkgrid-receita','chartwrap-receita', r.entries, 'revenue', granReceita, topnReceita, status);
-    renderChart('chart-qtd', c=>chartQtd=c, chartQtd, 'legend-qtd','sparkgrid-qtd','chartwrap-qtd', q.entries, 'quantity', granQtd, topnQtd, status);
+    document.getElementById('chart-fallback-produtos').style.display='none';
+    function metricValue(e){
+      if(chartMetric==='revenue') return e.value;
+      if(chartMetric==='quantity') return e.qty;
+      if(chartMetric==='views') return e.views||0;
+      return e.conversion==null ? -1 : e.conversion;
+    }
+    const sortedForChart = entries.slice().sort((a,b)=>metricValue(b)-metricValue(a));
+    renderProductChart(sortedForChart, chartMetric, granProdutos, topnProdutos, status);
   }catch(err){
-    console.error('Falha ao renderizar gráficos:', err);
-    ['chartwrap-receita','chartwrap-qtd'].forEach(id=>{
-      document.getElementById(id).style.display='none';
-    });
-    ['chart-fallback-receita','chart-fallback-qtd'].forEach(id=>{
-      document.getElementById(id).style.display='block';
-    });
+    console.error('Falha ao renderizar gráfico:', err);
+    document.getElementById('chartwrap-produtos').style.display='none';
+    document.getElementById('chart-fallback-produtos').style.display='block';
   }
 }
 
