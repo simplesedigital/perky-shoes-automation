@@ -1502,11 +1502,20 @@ function buildRanking(metricKey, filterText){
   entries = classify(entries, filteredTotal);
   entries.forEach((e,i)=>{ e.rank = i+1; });
 
+  // totalPrev e o total DE VERDADE do periodo anterior (mesmo filtro de texto/categoria
+  // aplicado, mas sem se limitar as referencias que tambem aparecem no periodo atual -
+  // senao um produto que vendeu antes e nao vende mais infla artificialmente o "vs
+  // periodo anterior", como se a queda nao tivesse acontecido)
   let totalPrev = 0;
+  prevAgg.forEach((o, ref) => {
+    if(norm && !matchNameOrCode(norm, salesNames[ref]||ref, ref)) return;
+    if(!matchCategoria(categoriaAbcSel, ref)) return;
+    totalPrev += metricKey==='revenue' ? o.revenue : o.qty;
+  });
+
   entries.forEach(e=>{
     const prevO = prevAgg.get(e.ref);
     const prevVal = prevO ? (metricKey==='revenue'?prevO.revenue:prevO.qty) : 0;
-    totalPrev += prevVal;
     let trend = null;
     if(prevVal>0) trend = (e.value-prevVal)/prevVal*100;
     else if(e.value>0) trend = Infinity;
