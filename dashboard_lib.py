@@ -716,53 +716,51 @@ def fetch_product_pageviews(days=90):
 
 
 # ---------------- PARTE 2F: MAPA CUPOM -> PROMOCAO (VNDA discounts) ----------------
-# Cada "discount" na VNDA e uma campanha/promocao (tem nome, ex: "Cupons Lojas
-# Fisicas Franquias"), e /discounts/{id}/coupons devolve os codigos de cupom
-# reais associados a ela - a peca que faltava pra ligar codigo -> nome legivel.
+# GET /coupon_codes/{code} devolve o discount_id daquele codigo especifico, e
+# GET /discounts/{id} devolve o nome da promocao - por isso resolvemos sob
+# demanda (so pros codigos que realmente aparecem em pedidos, uma vez cada,
+# pra sempre) em vez de varrer as ~1150 promocoes da VNDA toda vez.
 
-def fetch_coupon_promotions(full_refresh=None):
-    """Mapeia codigo de cupom -> nome da promocao. Por padrao e incremental: so
-    busca /discounts/{id}/coupons pra promocoes que ainda nao estao no mapa
-    salvo - a listagem tem ~1150 itens, e refazer as ~1150 chamadas de coupons
-    todo dia era o gargalo real da atualizacao diaria (um run chegou a levar
-    mais de 30min por causa disso, incluindo retries de rate limit). Faz um
-    refresh completo automaticamente 1x/semana (segunda-feira), pra pegar
-    promocoes existentes que ganharam cupons novos sem mudar de id."""
-    if full_refresh is None:
-        full_refresh = date.today().weekday() == 0  # segunda-feira
+def fetch_coupon_promotions():
+    """Mapeia codigo de cupom -> nome da promocao, sob demanda: roda depois de
+    sync_orders() e so resolve codigos de cupom que apareceram em algum
+    pedido e ainda nao estao no mapa salvo. Um codigo nao muda de promocao
+    depois de criado, entao cada codigo so precisa ser resolvido uma vez."""
+    orders = load_json("orders_master.json", [])
+    codes_em_uso = {o["coupon_code"] for o in orders if o.get("coupon_code")}
 
-    all_discounts = []
-    page = 1
-    while True:
-        data = fetch_with_retry(f"https://api.vnda.com.br/api/v2/discounts?per_page=100&page={page}")
-        if not data:
-            break
-        all_discounts.extend(data)
-        page += 1
-        if len(data) < 100:
-            break
+    mapping = load_json("cupons_promocoes.json", {})
+    novos = [c for c in codes_em_uso if c not in mapping]
 
-    mapping = {} if full_refresh else load_json("cupons_promocoes.json", {})
-    known_ids = {v["discount_id"] for v in mapping.values()}
-    to_process = [d for d in all_discounts if d["id"] not in known_ids]
-
-    erros = 0
-    for d in to_process:
-        time.sleep(0.15)  # evita rajada -> rate limit da VNDA (aconteceu num run real: 429 em sequencia)
+    discount_name_cache = {}
+    resolvidos = sem_match = 0
+    for code in novos:
+        time.sleep(0.1)
         try:
-            coupons = fetch_with_retry(f"https://api.vnda.com.br/api/v2/discounts/{d['id']}/coupons?per_page=100")
+            info = fetch_with_retry(f"https://api.vnda.com.br/api/v2/coupon_codes/{code}")
         except (urllib.error.HTTPError, RuntimeError):
-            erros += 1
+            mapping[code] = {"discount_id": None, "discount_name": ""}
+            sem_match += 1
             continue
-        for c in (coupons or []):
-            code = c.get("code")
-            if code:
-                mapping[code] = {"discount_id": d["id"], "discount_name": (d.get("name") or "").strip()}
+
+        discount_id = info.get("discount_id")
+        if discount_id is None:
+            mapping[code] = {"discount_id": None, "discount_name": ""}
+            sem_match += 1
+            continue
+
+        if discount_id not in discount_name_cache:
+            try:
+                d = fetch_with_retry(f"https://api.vnda.com.br/api/v2/discounts/{discount_id}")
+                discount_name_cache[discount_id] = (d.get("name") or "").strip()
+            except (urllib.error.HTTPError, RuntimeError):
+                discount_name_cache[discount_id] = ""
+        mapping[code] = {"discount_id": discount_id, "discount_name": discount_name_cache[discount_id]}
+        resolvidos += 1
 
     save_json("cupons_promocoes.json", mapping)
-    print(f"[cupons-promocoes] {'refresh completo' if full_refresh else 'incremental'}: "
-          f"{len(to_process)}/{len(all_discounts)} promocoes verificadas ({erros} erros), "
-          f"{len(mapping)} codigos de cupom mapeados no total")
+    print(f"[cupons-promocoes] {len(novos)} codigos novos ({resolvidos} resolvidos, {sem_match} sem promocao), "
+          f"{len(mapping)} codigos mapeados no total")
     return mapping
 
 
