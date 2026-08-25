@@ -735,9 +735,10 @@ def fetch_coupon_promotions():
     mapping = {}
     erros = 0
     for d in all_discounts:
+        time.sleep(0.15)  # evita rajada -> rate limit da VNDA (aconteceu num run real: 429 em sequencia)
         try:
             coupons = fetch_with_retry(f"https://api.vnda.com.br/api/v2/discounts/{d['id']}/coupons?per_page=100")
-        except urllib.error.HTTPError:
+        except (urllib.error.HTTPError, RuntimeError):
             erros += 1
             continue
         for c in (coupons or []):
