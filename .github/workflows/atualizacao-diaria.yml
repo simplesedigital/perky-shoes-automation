@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}
 
 concurrency:
-  group: atualizacao-diaria
+  group: perky-shoes-pipeline
   cancel-in-progress: false
 
 permissions:
