@@ -720,7 +720,17 @@ def fetch_product_pageviews(days=90):
 # Fisicas Franquias"), e /discounts/{id}/coupons devolve os codigos de cupom
 # reais associados a ela - a peca que faltava pra ligar codigo -> nome legivel.
 
-def fetch_coupon_promotions():
+def fetch_coupon_promotions(full_refresh=None):
+    """Mapeia codigo de cupom -> nome da promocao. Por padrao e incremental: so
+    busca /discounts/{id}/coupons pra promocoes que ainda nao estao no mapa
+    salvo - a listagem tem ~1150 itens, e refazer as ~1150 chamadas de coupons
+    todo dia era o gargalo real da atualizacao diaria (um run chegou a levar
+    mais de 30min por causa disso, incluindo retries de rate limit). Faz um
+    refresh completo automaticamente 1x/semana (segunda-feira), pra pegar
+    promocoes existentes que ganharam cupons novos sem mudar de id."""
+    if full_refresh is None:
+        full_refresh = date.today().weekday() == 0  # segunda-feira
+
     all_discounts = []
     page = 1
     while True:
@@ -732,9 +742,12 @@ def fetch_coupon_promotions():
         if len(data) < 100:
             break
 
-    mapping = {}
+    mapping = {} if full_refresh else load_json("cupons_promocoes.json", {})
+    known_ids = {v["discount_id"] for v in mapping.values()}
+    to_process = [d for d in all_discounts if d["id"] not in known_ids]
+
     erros = 0
-    for d in all_discounts:
+    for d in to_process:
         time.sleep(0.15)  # evita rajada -> rate limit da VNDA (aconteceu num run real: 429 em sequencia)
         try:
             coupons = fetch_with_retry(f"https://api.vnda.com.br/api/v2/discounts/{d['id']}/coupons?per_page=100")
@@ -747,8 +760,9 @@ def fetch_coupon_promotions():
                 mapping[code] = {"discount_id": d["id"], "discount_name": (d.get("name") or "").strip()}
 
     save_json("cupons_promocoes.json", mapping)
-    print(f"[cupons-promocoes] {len(all_discounts)} promocoes verificadas ({erros} erros), "
-          f"{len(mapping)} codigos de cupom mapeados")
+    print(f"[cupons-promocoes] {'refresh completo' if full_refresh else 'incremental'}: "
+          f"{len(to_process)}/{len(all_discounts)} promocoes verificadas ({erros} erros), "
+          f"{len(mapping)} codigos de cupom mapeados no total")
     return mapping
 
 
