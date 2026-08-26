@@ -65,6 +65,7 @@ STATE_FILES = [
     "estoque_deposito.json",
     "expedicao.json",
     "github_config.json",
+    "historico_crm_canal.csv",
     "historico_descontos.csv",
     "historico_estoque_eventos.csv",
     "historico_estoque_sku.csv",
@@ -712,6 +713,59 @@ def fetch_product_pageviews(days=90):
 
     print(f"[pageviews] {len(rows)} linhas salvas (ultimos {days} dias) | "
           f"{unmatched_views} views sem referencia correspondente")
+    return rows
+
+
+# ---------------- PARTE 2G: CANAL CRM (GA4) ----------------
+# Canal CRM = sessoes cujo sessionSourceMedium contem "mail" (cobre
+# email, mailchimp, newsletter, etc). Sessoes/pedidos/receita atribuidos
+# pelo proprio GA4, por dia, pra o frontend agregar em qualquer periodo
+# selecionado (mesmo padrao do historico_pageviews.csv).
+
+def fetch_crm_channel_data(days=400):
+    from google.oauth2 import service_account
+    import google.auth.transport.requests
+
+    creds = service_account.Credentials.from_service_account_file(
+        GOOGLE_SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/analytics.readonly"]
+    )
+    creds.refresh(google.auth.transport.requests.Request())
+    headers = {"Authorization": f"Bearer {creds.token}", "Content-Type": "application/json"}
+
+    body = json.dumps({
+        "dateRanges": [{"startDate": f"{days}daysAgo", "endDate": "today"}],
+        "dimensions": [{"name": "date"}],
+        "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}],
+        "dimensionFilter": {"filter": {
+            "fieldName": "sessionSourceMedium",
+            "stringFilter": {"matchType": "CONTAINS", "value": "mail", "caseSensitive": False},
+        }},
+        "limit": 100000,
+    }).encode()
+    req = urllib.request.Request(
+        f"https://analyticsdata.googleapis.com/v1beta/properties/{GA4_PROPERTY_ID}:runReport",
+        data=body, method="POST", headers=headers,
+    )
+    data = _urlopen_json_retry(req)
+
+    rows = []
+    for row in data.get("rows", []):
+        date_raw = row["dimensionValues"][0]["value"]  # YYYYMMDD
+        sessions = int(row["metricValues"][0]["value"])
+        transactions = int(row["metricValues"][1]["value"])
+        revenue = float(row["metricValues"][2]["value"])
+        rows.append([f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}", sessions, transactions, round(revenue, 2)])
+    rows.sort(key=lambda r: r[0])
+
+    csv_path = os.path.join(BASE_DIR, "historico_crm_canal.csv")
+    tmp_path = csv_path + f".tmp{os.getpid()}"
+    with open(tmp_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["data", "sessoes", "pedidos", "receita"])
+        writer.writerows(rows)
+    os.replace(tmp_path, csv_path)
+
+    print(f"[crm-canal] {len(rows)} dias salvos (ultimos {days} dias) | canal = origem/midia da sessao contem 'mail'")
     return rows
 
 
@@ -1978,6 +2032,13 @@ def build_dashboard_data():
         with open(pageviews_path, encoding="utf-8") as f:
             pageviews_rows = [[r["referencia"], r["data"], int(r["views"])] for r in csv.DictReader(f)]
 
+    crm_canal_path = os.path.join(BASE_DIR, "historico_crm_canal.csv")
+    crm_canal_rows = []
+    if os.path.isfile(crm_canal_path):
+        with open(crm_canal_path, encoding="utf-8") as f:
+            crm_canal_rows = [[r["data"], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])]
+                               for r in csv.DictReader(f)]
+
     for r in stock_sku:
         r["estoque"] = int(r["estoque"])
         r["disponivel"] = r["disponivel"] == "True"
@@ -2056,6 +2117,7 @@ def build_dashboard_data():
         "sales_rows": sales["rows"],
         "sales_names": sales["names"],
         "pageviews_rows": pageviews_rows,
+        "crm_canal_rows": crm_canal_rows,
         "stock_sku": stock_sku,
         "discounts": discounts,
         "orders_raw": orders_raw,
