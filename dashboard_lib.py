@@ -718,9 +718,10 @@ def fetch_product_pageviews(days=90):
 
 # ---------------- PARTE 2G: CANAL CRM (GA4) ----------------
 # Canal CRM = sessoes cujo sessionSourceMedium contem "mail" (cobre
-# email, mailchimp, newsletter, etc). Sessoes/pedidos/receita atribuidos
-# pelo proprio GA4, por dia, pra o frontend agregar em qualquer periodo
-# selecionado (mesmo padrao do historico_pageviews.csv).
+# email, mailchimp, newsletter, etc) E NAO contem "referral". Sessoes,
+# pedidos e receita atribuidos pelo proprio GA4, por dia e por origem/midia,
+# pra o frontend agregar em qualquer periodo selecionado (mesmo padrao do
+# historico_pageviews.csv) e montar a tabela de detalhe por origem/midia.
 
 def fetch_crm_channel_data(days=400):
     from google.oauth2 import service_account
@@ -734,12 +735,18 @@ def fetch_crm_channel_data(days=400):
 
     body = json.dumps({
         "dateRanges": [{"startDate": f"{days}daysAgo", "endDate": "today"}],
-        "dimensions": [{"name": "date"}],
+        "dimensions": [{"name": "date"}, {"name": "sessionSourceMedium"}],
         "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}],
-        "dimensionFilter": {"filter": {
-            "fieldName": "sessionSourceMedium",
-            "stringFilter": {"matchType": "CONTAINS", "value": "mail", "caseSensitive": False},
-        }},
+        "dimensionFilter": {"andGroup": {"expressions": [
+            {"filter": {
+                "fieldName": "sessionSourceMedium",
+                "stringFilter": {"matchType": "CONTAINS", "value": "mail", "caseSensitive": False},
+            }},
+            {"notExpression": {"filter": {
+                "fieldName": "sessionSourceMedium",
+                "stringFilter": {"matchType": "CONTAINS", "value": "referral", "caseSensitive": False},
+            }}},
+        ]}},
         "limit": 100000,
     }).encode()
     req = urllib.request.Request(
@@ -751,21 +758,24 @@ def fetch_crm_channel_data(days=400):
     rows = []
     for row in data.get("rows", []):
         date_raw = row["dimensionValues"][0]["value"]  # YYYYMMDD
+        source_medium = row["dimensionValues"][1]["value"]
         sessions = int(row["metricValues"][0]["value"])
         transactions = int(row["metricValues"][1]["value"])
         revenue = float(row["metricValues"][2]["value"])
-        rows.append([f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}", sessions, transactions, round(revenue, 2)])
+        rows.append([f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}", source_medium,
+                     sessions, transactions, round(revenue, 2)])
     rows.sort(key=lambda r: r[0])
 
     csv_path = os.path.join(BASE_DIR, "historico_crm_canal.csv")
     tmp_path = csv_path + f".tmp{os.getpid()}"
     with open(tmp_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["data", "sessoes", "pedidos", "receita"])
+        writer.writerow(["data", "origem_midia", "sessoes", "pedidos", "receita"])
         writer.writerows(rows)
     os.replace(tmp_path, csv_path)
 
-    print(f"[crm-canal] {len(rows)} dias salvos (ultimos {days} dias) | canal = origem/midia da sessao contem 'mail'")
+    print(f"[crm-canal] {len(rows)} linhas salvas (ultimos {days} dias) | "
+          f"canal = origem/midia contem 'mail' e nao contem 'referral'")
     return rows
 
 
@@ -2036,7 +2046,7 @@ def build_dashboard_data():
     crm_canal_rows = []
     if os.path.isfile(crm_canal_path):
         with open(crm_canal_path, encoding="utf-8") as f:
-            crm_canal_rows = [[r["data"], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])]
+            crm_canal_rows = [[r["data"], r["origem_midia"], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])]
                                for r in csv.DictReader(f)]
 
     for r in stock_sku:
