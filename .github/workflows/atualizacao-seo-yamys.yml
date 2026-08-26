@@ -1,0 +1,34 @@
+name: Atualizacao SEO Yamys
+
+on:
+  schedule:
+    - cron: "0 10 * * *"   # 07:00 BRT
+  workflow_dispatch: {}
+
+concurrency:
+  group: yamys-seo-dashboard
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Escreve credencial do Google (GA4/Search Console)
+        run: echo "${{ secrets.YAMYS_GOOGLE_SERVICE_ACCOUNT_B64 }}" | base64 -d > yamys_google_service_account.json
+
+      - name: Roda atualizacao do dashboard SEO
+        env:
+          GOOGLE_SERVICE_ACCOUNT_PATH: yamys_google_service_account.json
+          GITHUB_PAGES_TOKEN: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+        run: python atualizacao_dashboard_seo.py

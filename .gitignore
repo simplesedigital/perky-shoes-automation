@@ -10,6 +10,7 @@
 
 !dashboard_lib.py
 !atualizacao_diaria.py
+!atualizacao_dashboard_seo.py
 !sincronizar_pedidos.py
 !sincronizar_planilhas.py
 
