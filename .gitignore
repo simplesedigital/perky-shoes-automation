@@ -17,6 +17,9 @@
 !dashboard_template.html
 !chart.umd.js
 
+!assets_deposito/
+!assets_deposito/*.png
+
 !.github/
 !.github/workflows/
 !.github/workflows/*.yml
