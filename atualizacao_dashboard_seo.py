@@ -1,8 +1,9 @@
 """
 Atualização diária do Dashboard Orgânico - Yamys Baby.
-Busca dados de GA4 + Search Console e publica direto no GitHub Pages
-(le o index.html publicado, atualiza so os arrays de dados e as datas,
-e grava de volta - nao depende de nenhum arquivo local).
+Busca dados de GA4 + Search Console + pedidos com Order Bump (Vnda) e
+publica direto no GitHub Pages (le o index.html publicado, atualiza so
+os arrays de dados e as datas, e grava de volta - nao depende de nenhum
+arquivo local).
 Não usa nenhuma IA em tempo de execução - é um script determinístico puro.
 Roda via GitHub Actions (workflow "Atualizacao SEO Yamys").
 """
@@ -17,6 +18,7 @@ import urllib.request
 from datetime import datetime, timedelta
 
 CONFIG_PATH = r"C:\Users\adsom\.claude\yamys_seo_dashboard_config.json"
+VNDA_CONFIG_PATH = r"C:\Users\adsom\.claude\yamys_vnda_config.json"
 LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "logs_rotina")
 
 GITHUB_OWNER = "simplesedigital"
@@ -26,6 +28,8 @@ GA4_PROPERTY_ID = "482634584"
 GSC_SITE_URL = "sc-domain:yamysbaby.com"
 ARTIFACT_START_DATE = "2025-03-18"
 GSC_START_DATE = "2025-03-01"
+VNDA_API_BASE = "https://api.vnda.com.br"
+VNDA_SHOP_HOST = "www.yamysbaby.com"
 
 log_lines = []
 
@@ -62,6 +66,14 @@ def get_google_sa_path():
     if path:
         return path
     return load_local_config()["google_service_account_path"]
+
+
+def get_vnda_token():
+    token = os.environ.get("VNDA_API_TOKEN")
+    if token:
+        return token
+    with open(VNDA_CONFIG_PATH, encoding="utf-8") as f:
+        return json.load(f)["api_token"]
 
 
 def http_json(url, method="GET", headers=None, body=None):
@@ -178,6 +190,97 @@ def fetch_gsc_daily(token, site_url, start_date, end_date):
     return out
 
 
+def vnda_get(path, token, params=None):
+    url = f"{VNDA_API_BASE}{path}"
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    headers = {"Authorization": f"Bearer {token}", "X-Shop-Host": VNDA_SHOP_HOST}
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        pagination = resp.headers.get("X-Pagination")
+        data = json.loads(resp.read().decode("utf-8"))
+    return data, (json.loads(pagination) if pagination else None)
+
+
+def fetch_orders_in_range(token, start_date, end_date):
+    per_page = 100
+    _, pagination = vnda_get("/api/v2/orders", token, {"page": 1, "per_page": per_page})
+    page = pagination["total_pages"]
+
+    collected = []
+    while page >= 1:
+        orders, _ = vnda_get("/api/v2/orders", token, {"page": page, "per_page": per_page})
+        if not orders:
+            break
+        dates_on_page = [(o.get("received_at") or "")[:10] for o in orders]
+        for o, d in zip(orders, dates_on_page):
+            if d and start_date <= d <= end_date:
+                collected.append(o)
+        oldest_on_page = min(d for d in dates_on_page if d)
+        if oldest_on_page < start_date:
+            break
+        page -= 1
+    return collected
+
+
+def compute_order_bump_updates(orders):
+    daily = {}
+    items = []
+    for o in orders:
+        date = (o.get("received_at") or "")[:10]
+        if not date:
+            continue
+        day = daily.setdefault(date, {
+            "date": date, "totalOrders": 0, "bumpOrders": 0,
+            "bumpOrdersRevenue": 0.0, "bumpItemValue": 0.0,
+        })
+        day["totalOrders"] += 1
+        bump_items = [it for it in o.get("items", []) if (it.get("extra") or {}).get("orderbump_code")]
+        if bump_items:
+            day["bumpOrders"] += 1
+            day["bumpOrdersRevenue"] += o.get("total") or 0
+            for it in bump_items:
+                day["bumpItemValue"] += it.get("price") or 0
+                items.append({
+                    "date": date,
+                    "sku": it.get("sku"),
+                    "name": it.get("product_name"),
+                    "qty": it.get("quantity"),
+                    "price": it.get("price"),
+                    "originalPrice": it.get("original_price"),
+                    "orderCode": o.get("code"),
+                    "orderTotal": o.get("total"),
+                })
+    daily_list = sorted(daily.values(), key=lambda d: d["date"])
+    for d in daily_list:
+        d["bumpOrdersRevenue"] = round(d["bumpOrdersRevenue"], 2)
+        d["bumpItemValue"] = round(d["bumpItemValue"], 2)
+    items.sort(key=lambda i: i["date"])
+    return daily_list, items
+
+
+def parse_array(content, var_name):
+    start, end = find_array_span(content, var_name)
+    return json.loads(content[start + len(f"const {var_name} = "):end])
+
+
+def update_order_bump(content, yesterday):
+    existing_daily = parse_array(content, "orderBumpDaily")
+    existing_items = parse_array(content, "orderBumpItems")
+    last_date = existing_daily[-1]["date"]
+    start_date = (datetime.strptime(last_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    if start_date > yesterday:
+        return content, 0, 0
+
+    token = get_vnda_token()
+    orders = fetch_orders_in_range(token, start_date, yesterday)
+    new_daily, new_items = compute_order_bump_updates(orders)
+
+    content = replace_array(content, "orderBumpDaily", existing_daily + new_daily)
+    content = replace_array(content, "orderBumpItems", existing_items + new_items)
+    return content, len(new_daily), len(new_items)
+
+
 def find_array_span(content, var_name):
     marker = f"const {var_name} = ["
     start = content.index(marker)
@@ -288,6 +391,12 @@ def main():
         log("HTML publicado atual obtido do GitHub.")
 
         html_content = update_html(current_html, ga4_daily, gsc_daily)
+
+        try:
+            html_content, n_days, n_items = update_order_bump(html_content, yesterday)
+            log(f"Order Bump: {n_days} dia(s) novo(s), {n_items} item(ns) novo(s).")
+        except Exception as e:
+            log(f"AVISO: falha ao atualizar Order Bump, seguindo sem esse dado: {e}")
 
         push_html(github_token, sha, html_content)
         log("Publicado no GitHub Pages com sucesso.")

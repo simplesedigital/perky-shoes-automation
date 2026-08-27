@@ -31,4 +31,5 @@ jobs:
         env:
           GOOGLE_SERVICE_ACCOUNT_PATH: yamys_google_service_account.json
           GITHUB_PAGES_TOKEN: ${{ secrets.PAGES_DEPLOY_TOKEN }}
+          VNDA_API_TOKEN: ${{ secrets.YAMYS_VNDA_API_TOKEN }}
         run: python atualizacao_dashboard_seo.py
