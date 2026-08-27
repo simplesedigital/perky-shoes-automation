@@ -2385,33 +2385,37 @@ if(crmMaxDate){
   crmStartInput.min = crmMinDate; crmEndInput.min = crmMinDate;
   crmStartInput.max = crmMaxDate; crmEndInput.max = crmMaxDate;
   // usa o mesmo periodo default das outras abas, mas limitado a janela de dados do GA4
-  crmStartInput.value = fpStartInput.value < crmMinDate ? crmMinDate : fpStartInput.value;
-  crmEndInput.value = fpEndInput.value > crmMaxDate ? crmMaxDate : fpEndInput.value;
+  let crmDefStart = fpStartInput.value < crmMinDate ? crmMinDate : fpStartInput.value;
+  let crmDefEnd = fpEndInput.value > crmMaxDate ? crmMaxDate : fpEndInput.value;
+  if(crmDefEnd < crmDefStart){ crmDefStart = crmMinDate; crmDefEnd = crmMaxDate; }
+  crmStartInput.value = crmDefStart;
+  crmEndInput.value = crmDefEnd;
   initDateRangePicker('crm-daterange-btn', 'crm-start', 'crm-end');
 }
 
 function crmAgg(rows, start, end){
-  let sessions=0, orders=0, revenue=0;
-  const byDate = new Map(); // data -> {sessions, orders, revenue}
-  const byOrigem = new Map(); // 2a dimensao (origem/midia ou nome da automacao) -> {sessions, orders, revenue}
+  let sessions=0, orders=0, revenue=0, contacts=0, hasContacts=false;
+  const byDate = new Map(); // data -> {sessions, orders, revenue, contacts}
+  const byOrigem = new Map(); // 2a dimensao (origem/midia ou nome da automacao) -> {sessions, orders, revenue, contacts, hasContacts}
   for(const r of rows){
-    const [d, origem, s, o, rev] = r;
+    const [d, origem, s, o, rev, cont] = r;
     if(d<start || d>end) continue;
     sessions += s; orders += o; revenue += rev;
-    if(!byDate.has(d)) byDate.set(d, {sessions:0, orders:0, revenue:0});
+    if(!byDate.has(d)) byDate.set(d, {sessions:0, orders:0, revenue:0, contacts:0});
     const bd = byDate.get(d);
     bd.sessions += s; bd.orders += o; bd.revenue += rev;
-    if(!byOrigem.has(origem)) byOrigem.set(origem, {sessions:0, orders:0, revenue:0});
+    if(!byOrigem.has(origem)) byOrigem.set(origem, {sessions:0, orders:0, revenue:0, contacts:0, hasContacts:false});
     const bo = byOrigem.get(origem);
     bo.sessions += s; bo.orders += o; bo.revenue += rev;
+    if(cont!=null){ contacts += cont; hasContacts = true; bd.contacts += cont; bo.contacts += cont; bo.hasContacts = true; }
   }
   const series = Array.from(byDate.entries()).sort((a,b)=> a[0]<b[0]?-1:1)
-    .map(([d,v])=>[d, v.sessions, v.orders, v.revenue]);
+    .map(([d,v])=>[d, v.sessions, v.orders, v.revenue, v.contacts]);
   const origemRows = Array.from(byOrigem.entries())
-    .map(([origem,v])=>({origem, sessoes:v.sessions, pedidos:v.orders, receita:v.revenue,
+    .map(([origem,v])=>({origem, sessoes:v.sessions, pedidos:v.orders, receita:v.revenue, contatos: v.hasContacts?v.contacts:null,
       conversao: v.sessions>0 ? v.orders/v.sessions*100 : 0}))
     .sort((a,b)=> b.sessoes - a.sessoes);
-  return {sessions, orders, revenue, series, origemRows};
+  return {sessions, orders, revenue, contacts, hasContacts, series, origemRows};
 }
 
 function crmDeltaHTML(curV, prevV){
@@ -2498,17 +2502,21 @@ let crmAutoChart = null;
 
 const CRM_AUTOMACOES_COLUMNS = [
   {key:'origem', label:'Automação', type:'text', format:r=>r.origem||'(not set)', sortValue:r=>r.origem},
-  {key:'sessoes', label:'Sessões', type:'number', format:r=>fmtInt.format(r.sessoes), sortValue:r=>r.sessoes},
-  {key:'pedidos', label:'Pedidos', type:'number', format:r=>fmtInt.format(r.pedidos), sortValue:r=>r.pedidos},
-  {key:'receita', label:'Faturamento', type:'number', format:r=>fmtBRL.format(r.receita), sortValue:r=>r.receita},
+  {key:'contatos', label:'Contatos entraram', type:'number', format:r=>r.contatos==null?'—':fmtInt.format(r.contatos), sortValue:r=>r.contatos==null?-1:r.contatos},
+  {key:'sessoes', label:'Sessões no site', type:'number', format:r=>fmtInt.format(r.sessoes), sortValue:r=>r.sessoes},
+  {key:'pedidos', label:'Compras no site', type:'number', format:r=>fmtInt.format(r.pedidos), sortValue:r=>r.pedidos},
+  {key:'receita', label:'Receita no site', type:'number', format:r=>fmtBRL.format(r.receita), sortValue:r=>r.receita},
   {key:'conversao', label:'Taxa de conversão', type:'number', format:r=>fmtPctPlain(r.conversao), sortValue:r=>r.conversao},
 ];
 
 if(crmAutoMaxDate){
   crmAutoStartInput.min = crmAutoMinDate; crmAutoEndInput.min = crmAutoMinDate;
   crmAutoStartInput.max = crmAutoMaxDate; crmAutoEndInput.max = crmAutoMaxDate;
-  crmAutoStartInput.value = fpStartInput.value < crmAutoMinDate ? crmAutoMinDate : fpStartInput.value;
-  crmAutoEndInput.value = fpEndInput.value > crmAutoMaxDate ? crmAutoMaxDate : fpEndInput.value;
+  let crmAutoDefStart = fpStartInput.value < crmAutoMinDate ? crmAutoMinDate : fpStartInput.value;
+  let crmAutoDefEnd = fpEndInput.value > crmAutoMaxDate ? crmAutoMaxDate : fpEndInput.value;
+  if(crmAutoDefEnd < crmAutoDefStart){ crmAutoDefStart = crmAutoMinDate; crmAutoDefEnd = crmAutoMaxDate; }
+  crmAutoStartInput.value = crmAutoDefStart;
+  crmAutoEndInput.value = crmAutoDefEnd;
   initDateRangePicker('crmauto-daterange-btn', 'crmauto-start', 'crmauto-end');
 }
 
@@ -2532,10 +2540,10 @@ function renderCrmAuto(){
   const convPrev = prev.sessions>0 ? prev.orders/prev.sessions*100 : 0;
 
   document.getElementById('crmauto-kpirow').innerHTML = `
-    <div class="kpi"><p class="label">Sessões</p><p class="value">${fmtInt.format(cur.sessions)}</p>${crmDeltaHTML(cur.sessions, prev.sessions)}</div>
-    <div class="kpi"><p class="label">Pedidos</p><p class="value">${fmtInt.format(cur.orders)}</p>${crmDeltaHTML(cur.orders, prev.orders)}</div>
-    <div class="kpi"><p class="label">Faturamento</p><p class="value">${fmtBRL.format(cur.revenue)}</p>${crmDeltaHTML(cur.revenue, prev.revenue)}</div>
-    <div class="kpi"><p class="label">Taxa de conversão</p><p class="value">${fmtPctPlain(convCur)}</p>${crmDeltaHTML(convCur, convPrev)}</div>
+    <div class="kpi"><p class="label">Contatos entraram</p><p class="value">${cur.hasContacts?fmtInt.format(cur.contacts):'—'}</p><span class="delta flat">${cur.hasContacts?'na automação, no período':'sem dado no período (snapshot começou em '+crmAutoMinDate+')'}</span></div>
+    <div class="kpi"><p class="label">Sessões no site</p><p class="value">${fmtInt.format(cur.sessions)}</p>${crmDeltaHTML(cur.sessions, prev.sessions)}</div>
+    <div class="kpi"><p class="label">Compras no site</p><p class="value">${fmtInt.format(cur.orders)}</p>${crmDeltaHTML(cur.orders, prev.orders)}</div>
+    <div class="kpi"><p class="label">Receita no site</p><p class="value">${fmtBRL.format(cur.revenue)}</p>${crmDeltaHTML(cur.revenue, prev.revenue)}</div>
   `;
   document.getElementById('crmauto-compare-hint').textContent = comparePeriodText(start, end);
 
@@ -2547,20 +2555,22 @@ function renderCrmAuto(){
       data:{
         labels,
         datasets:[
-          {type:'line', label:'Sessões', data:cur.series.map(r=>r[1]), yAxisID:'y', borderColor:seriesColor(0), backgroundColor:seriesColor(0), borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15},
-          {type:'line', label:'Faturamento', data:cur.series.map(r=>r[3]), yAxisID:'y1', borderColor:seriesColor(1), backgroundColor:seriesColor(1), borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15},
+          {type:'bar', label:'Contatos entraram', data:cur.series.map(r=>r[4]), yAxisID:'y2', backgroundColor:seriesColor(2)+'80', borderColor:seriesColor(2), borderWidth:1, order:2},
+          {type:'line', label:'Sessões', data:cur.series.map(r=>r[1]), yAxisID:'y', borderColor:seriesColor(0), backgroundColor:seriesColor(0), borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15, order:1},
+          {type:'line', label:'Receita', data:cur.series.map(r=>r[3]), yAxisID:'y1', borderColor:seriesColor(1), backgroundColor:seriesColor(1), borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15, order:0},
         ]
       },
       options:{
         responsive:true, maintainAspectRatio:false,
         interaction:{mode:'index', intersect:false},
         plugins:{ legend:{position:'top', labels:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-primary')}},
-          tooltip:{ callbacks:{ label:(c)=> c.dataset.label+': '+(c.dataset.label==='Faturamento'?fmtBRL.format(c.parsed.y):fmtInt.format(c.parsed.y)) } }
+          tooltip:{ callbacks:{ label:(c)=> c.dataset.label+': '+(c.dataset.label==='Receita'?fmtBRL.format(c.parsed.y):fmtInt.format(c.parsed.y)) } }
         },
         scales:{
           x:{grid:{display:false}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted'), maxRotation:0, autoSkip:true}},
           y:{position:'left', grid:{color:getComputedStyle(document.documentElement).getPropertyValue('--grid')}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted')}},
           y1:{position:'right', grid:{display:false}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted'), callback:(v)=>fmtBRL.format(v)}},
+          y2:{display:false},
         }
       }
     });

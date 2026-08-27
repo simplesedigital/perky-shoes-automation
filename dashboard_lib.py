@@ -65,6 +65,7 @@ STATE_FILES = [
     "estoque_deposito.json",
     "expedicao.json",
     "github_config.json",
+    "historico_bevean_segmentos.csv",
     "historico_crm_automacoes.csv",
     "historico_crm_canal.csv",
     "historico_descontos.csv",
@@ -843,6 +844,59 @@ def fetch_crm_automacoes_data(days=400):
     print(f"[crm-automacoes] {len(rows)} linhas salvas (ultimos {days} dias) | "
           f"filtro: canal CRM + utm_content contem 'automacao'")
     return rows
+
+
+# ---------------- PARTE 2I: SNAPSHOT DE SEGMENTOS DA BEVEAN ----------------
+# A API da Bevean nao devolve historico de quando cada contato entrou num
+# segmento, so o total atual. Por isso guardamos um snapshot diario do
+# customer_count e calculamos "quantos entraram" pela diferenca entre um dia
+# e o anterior - so funciona a partir do dia em que comecamos a guardar
+# (nao da pra reconstruir o passado).
+#
+# Mapeia o nome de automacao usado no utm_campaign (GA4) pro segmento
+# correspondente na Bevean que dispara aquela automacao.
+AUTOMACOES_CONFIG = {
+    "boas-vindas-newsletter": {
+        "nome_exibicao": "Boas-vindas (Popup Newsletter)",
+        "bevean_segment_id": "982870a1-37b2-4461-ab94-0960de6a718c",
+    },
+}
+
+
+def _bevean_api_get(path):
+    key = _secret("BEVEAN_API_KEY", "bevean_api_key")
+    req = urllib.request.Request(
+        f"https://api.bevean.com{path}",
+        headers={
+            "Authorization": f"Bearer {key}",
+            # a Cloudflare da Bevean bloqueia o user-agent padrao do Python (WAF)
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json",
+        },
+    )
+    return _urlopen_json_retry(req)
+
+
+def fetch_bevean_segment_snapshots():
+    today = date.today().isoformat()
+    segmentos = _bevean_api_get("/v1/segments?limit=100").get("data", [])
+    by_id = {s["id"]: s for s in segmentos}
+
+    linhas_hoje = []
+    for utm_campaign, cfg in AUTOMACOES_CONFIG.items():
+        seg = by_id.get(cfg["bevean_segment_id"])
+        if not seg:
+            print(f"[bevean-segmentos] segmento nao encontrado para '{utm_campaign}' "
+                  f"(id={cfg['bevean_segment_id']})")
+            continue
+        linhas_hoje.append([today, utm_campaign, seg["name"], seg["customer_count"]])
+
+    csv_path = os.path.join(BASE_DIR, "historico_bevean_segmentos.csv")
+    fieldnames = ["data", "utm_campaign", "segmento_nome", "customer_count"]
+    write_csv_replace_today(csv_path, fieldnames, [dict(zip(fieldnames, r)) for r in linhas_hoje], today)
+
+    print(f"[bevean-segmentos] {len(linhas_hoje)} snapshot(s) salvos para {today}")
+    return linhas_hoje
 
 
 # ---------------- PARTE 2F: MAPA CUPOM -> PROMOCAO (VNDA discounts) ----------------
@@ -2116,11 +2170,42 @@ def build_dashboard_data():
                                for r in csv.DictReader(f)]
 
     crm_automacoes_path = os.path.join(BASE_DIR, "historico_crm_automacoes.csv")
-    crm_automacoes_rows = []
+    ga4_por_campanha_data = {}  # (utm_campaign, data) -> (sessoes, pedidos, receita)
     if os.path.isfile(crm_automacoes_path):
         with open(crm_automacoes_path, encoding="utf-8") as f:
-            crm_automacoes_rows = [[r["data"], r["automacao"], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])]
-                                    for r in csv.DictReader(f)]
+            for r in csv.DictReader(f):
+                ga4_por_campanha_data[(r["automacao"], r["data"])] = (
+                    int(r["sessoes"]), int(r["pedidos"]), float(r["receita"]))
+
+    bevean_seg_path = os.path.join(BASE_DIR, "historico_bevean_segmentos.csv")
+    contagem_por_campanha = defaultdict(dict)  # utm_campaign -> {data: customer_count}
+    if os.path.isfile(bevean_seg_path):
+        with open(bevean_seg_path, encoding="utf-8") as f:
+            for r in csv.DictReader(f):
+                contagem_por_campanha[r["utm_campaign"]][r["data"]] = int(r["customer_count"])
+
+    # "contatos que entraram" = diferenca do customer_count entre um dia e o
+    # anterior (a Bevean nao guarda historico de entrada, so o total atual -
+    # so da pra saber a partir do primeiro dia que comecamos a tirar snapshot).
+    contatos_por_campanha_data = {}
+    for utm_campaign, por_data in contagem_por_campanha.items():
+        datas_ordenadas = sorted(por_data.keys())
+        anterior = None
+        for d in datas_ordenadas:
+            if anterior is not None:
+                contatos_por_campanha_data[(utm_campaign, d)] = por_data[d] - por_data[anterior]
+            anterior = d
+
+    todas_campanhas = set(c for c, _ in ga4_por_campanha_data) | set(contagem_por_campanha.keys())
+    crm_automacoes_rows = []
+    for utm_campaign in todas_campanhas:
+        nome_exibicao = AUTOMACOES_CONFIG.get(utm_campaign, {}).get("nome_exibicao", utm_campaign)
+        datas = set(d for (c, d) in ga4_por_campanha_data if c == utm_campaign)
+        datas |= set(contagem_por_campanha.get(utm_campaign, {}).keys())
+        for d in sorted(datas):
+            sessoes, pedidos, receita = ga4_por_campanha_data.get((utm_campaign, d), (0, 0, 0.0))
+            contatos = contatos_por_campanha_data.get((utm_campaign, d))
+            crm_automacoes_rows.append([d, nome_exibicao, sessoes, pedidos, receita, contatos])
 
     for r in stock_sku:
         r["estoque"] = int(r["estoque"])
