@@ -2418,28 +2418,34 @@ if(crmMaxDate){
 }
 
 function crmAgg(rows, start, end){
-  let sessions=0, orders=0, revenue=0, contacts=0, hasContacts=false;
-  const byDate = new Map(); // data -> {sessions, orders, revenue, contacts}
-  const byOrigem = new Map(); // 2a dimensao (origem/midia ou nome da automacao) -> {sessions, orders, revenue, contacts, hasContacts}
+  let sessions=0, orders=0, revenue=0, contacts=0, hasContacts=false, cupomPedidos=0, cupomReceita=0, hasCupom=false;
+  const byDate = new Map(); // data -> {sessions, orders, revenue, contacts, cupomPedidos, cupomReceita}
+  const byOrigem = new Map(); // 2a dimensao (origem/midia ou nome da automacao) -> {sessions, orders, revenue, contacts, hasContacts, cupomPedidos, cupomReceita, hasCupom}
   for(const r of rows){
-    const [d, origem, s, o, rev, cont] = r;
+    const [d, origem, s, o, rev, cont, cupomPed, cupomRec] = r;
     if(d<start || d>end) continue;
     sessions += s; orders += o; revenue += rev;
-    if(!byDate.has(d)) byDate.set(d, {sessions:0, orders:0, revenue:0, contacts:0});
+    if(!byDate.has(d)) byDate.set(d, {sessions:0, orders:0, revenue:0, contacts:0, cupomPedidos:0, cupomReceita:0});
     const bd = byDate.get(d);
     bd.sessions += s; bd.orders += o; bd.revenue += rev;
-    if(!byOrigem.has(origem)) byOrigem.set(origem, {sessions:0, orders:0, revenue:0, contacts:0, hasContacts:false});
+    if(!byOrigem.has(origem)) byOrigem.set(origem, {sessions:0, orders:0, revenue:0, contacts:0, hasContacts:false, cupomPedidos:0, cupomReceita:0, hasCupom:false});
     const bo = byOrigem.get(origem);
     bo.sessions += s; bo.orders += o; bo.revenue += rev;
     if(cont!=null){ contacts += cont; hasContacts = true; bd.contacts += cont; bo.contacts += cont; bo.hasContacts = true; }
+    if(cupomPed!=null){
+      cupomPedidos += cupomPed; cupomReceita += cupomRec; hasCupom = true;
+      bd.cupomPedidos += cupomPed; bd.cupomReceita += cupomRec;
+      bo.cupomPedidos += cupomPed; bo.cupomReceita += cupomRec; bo.hasCupom = true;
+    }
   }
   const series = Array.from(byDate.entries()).sort((a,b)=> a[0]<b[0]?-1:1)
-    .map(([d,v])=>[d, v.sessions, v.orders, v.revenue, v.contacts]);
+    .map(([d,v])=>[d, v.sessions, v.orders, v.revenue, v.contacts, v.cupomPedidos, v.cupomReceita]);
   const origemRows = Array.from(byOrigem.entries())
     .map(([origem,v])=>({origem, sessoes:v.sessions, pedidos:v.orders, receita:v.revenue, contatos: v.hasContacts?v.contacts:null,
+      cupomPedidos: v.hasCupom?v.cupomPedidos:null, cupomReceita: v.hasCupom?v.cupomReceita:null,
       conversao: v.sessions>0 ? v.orders/v.sessions*100 : 0}))
     .sort((a,b)=> b.sessoes - a.sessoes);
-  return {sessions, orders, revenue, contacts, hasContacts, series, origemRows};
+  return {sessions, orders, revenue, contacts, hasContacts, cupomPedidos, cupomReceita, hasCupom, series, origemRows};
 }
 
 function crmDeltaHTML(curV, prevV){
@@ -2531,6 +2537,8 @@ const CRM_AUTOMACOES_COLUMNS = [
   {key:'pedidos', label:'Compras no site', type:'number', format:r=>fmtInt.format(r.pedidos), sortValue:r=>r.pedidos},
   {key:'receita', label:'Receita no site', type:'number', format:r=>fmtBRL.format(r.receita), sortValue:r=>r.receita},
   {key:'conversao', label:'Taxa de conversão', type:'number', format:r=>fmtPctPlain(r.conversao), sortValue:r=>r.conversao},
+  {key:'cupomPedidos', label:'Pedidos com cupom', type:'number', format:r=>r.cupomPedidos==null?'—':fmtInt.format(r.cupomPedidos), sortValue:r=>r.cupomPedidos==null?-1:r.cupomPedidos},
+  {key:'cupomReceita', label:'Receita com cupom', type:'number', format:r=>r.cupomReceita==null?'—':fmtBRL.format(r.cupomReceita), sortValue:r=>r.cupomReceita==null?-1:r.cupomReceita},
 ];
 
 if(crmAutoMaxDate){
@@ -2568,6 +2576,7 @@ function renderCrmAuto(){
     <div class="kpi"><p class="label">Sessões no site</p><p class="value">${fmtInt.format(cur.sessions)}</p>${crmDeltaHTML(cur.sessions, prev.sessions)}</div>
     <div class="kpi"><p class="label">Compras no site</p><p class="value">${fmtInt.format(cur.orders)}</p>${crmDeltaHTML(cur.orders, prev.orders)}</div>
     <div class="kpi"><p class="label">Receita no site</p><p class="value">${fmtBRL.format(cur.revenue)}</p>${crmDeltaHTML(cur.revenue, prev.revenue)}</div>
+    <div class="kpi"><p class="label">Pedidos com cupom</p><p class="value">${cur.hasCupom?fmtInt.format(cur.cupomPedidos):'—'}</p>${cur.hasCupom?crmDeltaHTML(cur.cupomPedidos, prev.cupomPedidos):'<span class="delta flat">sem cupom configurado nessa automação</span>'}</div>
   `;
   document.getElementById('crmauto-compare-hint').textContent = comparePeriodText(start, end);
 

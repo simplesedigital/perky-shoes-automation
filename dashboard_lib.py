@@ -869,6 +869,7 @@ AUTOMACOES_CONFIG = {
     "boas-vindas-newsletter": {
         "nome_exibicao": "Boas-vindas (Popup Newsletter)",
         "bevean_segment_id": "982870a1-37b2-4461-ab94-0960de6a718c",
+        "cupom": "BOASVINDAS",
     },
 }
 
@@ -2213,16 +2214,35 @@ def build_dashboard_data():
                 contatos_por_campanha_data[(utm_campaign, d)] = por_data[d] - por_data[anterior]
             anterior = d
 
+    # uso de cupom por dia (pra cruzar com a automacao correspondente, quando
+    # configurada em AUTOMACOES_CONFIG - so pros dias que a automacao ja
+    # aparece no relatorio, pra nao trazer historico antigo do cupom de antes
+    # da automacao existir)
+    orders_master_para_cupom = load_json("orders_master.json", [])
+    cupom_por_dia = defaultdict(lambda: defaultdict(lambda: [0, 0.0]))  # cupom -> data -> [pedidos, receita]
+    for o in orders_master_para_cupom:
+        code = o.get("coupon_code")
+        if code and o.get("date"):
+            entry = cupom_por_dia[code][o["date"]]
+            entry[0] += 1
+            entry[1] += round(o.get("total") or 0.0, 2)
+
     todas_campanhas = set(c for c, _ in ga4_por_campanha_data) | set(contagem_por_campanha.keys())
     crm_automacoes_rows = []
     for utm_campaign in todas_campanhas:
-        nome_exibicao = AUTOMACOES_CONFIG.get(utm_campaign, {}).get("nome_exibicao", utm_campaign)
+        cfg = AUTOMACOES_CONFIG.get(utm_campaign, {})
+        nome_exibicao = cfg.get("nome_exibicao", utm_campaign)
+        cupom_cfg = cfg.get("cupom")
         datas = set(d for (c, d) in ga4_por_campanha_data if c == utm_campaign)
         datas |= set(contagem_por_campanha.get(utm_campaign, {}).keys())
         for d in sorted(datas):
             sessoes, pedidos, receita = ga4_por_campanha_data.get((utm_campaign, d), (0, 0, 0.0))
             contatos = contatos_por_campanha_data.get((utm_campaign, d))
-            crm_automacoes_rows.append([d, nome_exibicao, sessoes, pedidos, receita, contatos])
+            if cupom_cfg:
+                cupom_pedidos, cupom_receita = cupom_por_dia.get(cupom_cfg, {}).get(d, [0, 0.0])
+            else:
+                cupom_pedidos, cupom_receita = None, None
+            crm_automacoes_rows.append([d, nome_exibicao, sessoes, pedidos, receita, contatos, cupom_pedidos, cupom_receita])
 
     for r in stock_sku:
         r["estoque"] = int(r["estoque"])
