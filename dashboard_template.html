@@ -1526,7 +1526,7 @@ function syncDynamicSticky(){
   if(movedSub && movedSubPh){ movedSubPh.replaceWith(movedSub); movedSub=null; movedSubPh=null; }
   if(movedCard && movedCardPh){ movedCardPh.replaceWith(movedCard); movedCard=null; movedCardPh=null; }
   if(!headerPinned) return;
-  const topPanel = document.querySelector('#toppanel-padroes.active, #toppanel-produto.active, #toppanel-deposito.active, #toppanel-vendas.active');
+  const topPanel = document.querySelector('#toppanel-padroes.active, #toppanel-produto.active, #toppanel-deposito.active, #toppanel-vendas.active, #toppanel-crm.active');
   const sub = topPanel ? topPanel.querySelector(':scope > .tabbar.sub') : null;
   const leafPanel = topPanel ? (topPanel.querySelector(':scope > .panel.active') || topPanel) : null;
   const card = leafPanel ? leafPanel.querySelector(':scope > .card') : null;
