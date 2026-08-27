@@ -25,7 +25,7 @@ jobs:
       - run: pip install -r requirements.txt
 
       - name: Escreve credencial do Google (GA4/Search Console)
-        run: echo "${{ secrets.YAMYS_GOOGLE_SERVICE_ACCOUNT_B64 }}" | base64 -d > yamys_google_service_account.json
+        run: echo "${{ secrets.GOOGLE_SERVICE_ACCOUNT_B64 }}" | base64 -d > yamys_google_service_account.json
 
       - name: Roda atualizacao do dashboard SEO
         env:
