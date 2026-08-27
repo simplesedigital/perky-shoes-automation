@@ -68,6 +68,7 @@ STATE_FILES = [
     "historico_bevean_segmentos.csv",
     "historico_crm_automacoes.csv",
     "historico_crm_canal.csv",
+    "historico_crm_transmissoes.csv",
     "historico_descontos.csv",
     "historico_estoque_eventos.csv",
     "historico_estoque_sku.csv",
@@ -781,12 +782,13 @@ def fetch_crm_channel_data(days=400):
     return rows
 
 
-# ---------------- PARTE 2H: AUTOMACOES DE E-MAIL (GA4, via utm_content) ----------------
-# Dentro do canal CRM, separa o que e automacao (utm_content=automacao,
-# configurado na Bevean) do que e disparo unico. Por dia e por nome de
-# campanha (utm_campaign), pra o frontend distinguir cada automacao ativa.
+# ---------------- PARTE 2H: AUTOMACOES E TRANSMISSOES DE E-MAIL (GA4, via utm_content) ----------------
+# Dentro do canal CRM, separa por tipo de disparo usando o utm_content
+# configurado na Bevean: "automacao" (fluxo automatico) ou "transmissao"
+# (disparo unico/campanha pontual). Por dia e por nome de campanha
+# (utm_campaign), pra o frontend distinguir cada uma.
 
-def fetch_crm_automacoes_data(days=400):
+def _fetch_crm_by_utm_content(content_filtro, csv_filename, col_nome, days=400):
     from google.oauth2 import service_account
     import google.auth.transport.requests
 
@@ -811,7 +813,7 @@ def fetch_crm_automacoes_data(days=400):
             }}},
             {"filter": {
                 "fieldName": "sessionManualAdContent",
-                "stringFilter": {"matchType": "CONTAINS", "value": "automacao", "caseSensitive": False},
+                "stringFilter": {"matchType": "CONTAINS", "value": content_filtro, "caseSensitive": False},
             }},
         ]}},
         "limit": 100000,
@@ -833,17 +835,25 @@ def fetch_crm_automacoes_data(days=400):
                      sessions, transactions, round(revenue, 2)])
     rows.sort(key=lambda r: r[0])
 
-    csv_path = os.path.join(BASE_DIR, "historico_crm_automacoes.csv")
+    csv_path = os.path.join(BASE_DIR, csv_filename)
     tmp_path = csv_path + f".tmp{os.getpid()}"
     with open(tmp_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["data", "automacao", "sessoes", "pedidos", "receita"])
+        writer.writerow(["data", col_nome, "sessoes", "pedidos", "receita"])
         writer.writerows(rows)
     os.replace(tmp_path, csv_path)
 
-    print(f"[crm-automacoes] {len(rows)} linhas salvas (ultimos {days} dias) | "
-          f"filtro: canal CRM + utm_content contem 'automacao'")
+    print(f"[crm-{col_nome}] {len(rows)} linhas salvas (ultimos {days} dias) | "
+          f"filtro: canal CRM + utm_content contem '{content_filtro}'")
     return rows
+
+
+def fetch_crm_automacoes_data(days=400):
+    return _fetch_crm_by_utm_content("automacao", "historico_crm_automacoes.csv", "automacao", days)
+
+
+def fetch_crm_transmissoes_data(days=400):
+    return _fetch_crm_by_utm_content("transmissao", "historico_crm_transmissoes.csv", "transmissao", days)
 
 
 # ---------------- PARTE 2I: SNAPSHOT DE SEGMENTOS DA BEVEAN ----------------
@@ -2169,6 +2179,13 @@ def build_dashboard_data():
             crm_canal_rows = [[r["data"], r["origem_midia"], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])]
                                for r in csv.DictReader(f)]
 
+    crm_transmissoes_path = os.path.join(BASE_DIR, "historico_crm_transmissoes.csv")
+    crm_transmissoes_rows = []
+    if os.path.isfile(crm_transmissoes_path):
+        with open(crm_transmissoes_path, encoding="utf-8") as f:
+            crm_transmissoes_rows = [[r["data"], r["transmissao"], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])]
+                                      for r in csv.DictReader(f)]
+
     crm_automacoes_path = os.path.join(BASE_DIR, "historico_crm_automacoes.csv")
     ga4_por_campanha_data = {}  # (utm_campaign, data) -> (sessoes, pedidos, receita)
     if os.path.isfile(crm_automacoes_path):
@@ -2287,6 +2304,7 @@ def build_dashboard_data():
         "pageviews_rows": pageviews_rows,
         "crm_canal_rows": crm_canal_rows,
         "crm_automacoes_rows": crm_automacoes_rows,
+        "crm_transmissoes_rows": crm_transmissoes_rows,
         "stock_sku": stock_sku,
         "discounts": discounts,
         "orders_raw": orders_raw,

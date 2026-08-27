@@ -1000,6 +1000,7 @@ tbody tr:last-child td{border-bottom:none;}
   <div class="tabbar sub" role="tablist">
     <button class="tabbtn" id="crmbtn-email" role="tab" aria-selected="true" onclick="switchCrmSub('email')">Canal E-mail</button>
     <button class="tabbtn" id="crmbtn-automacoes" role="tab" aria-selected="false" onclick="switchCrmSub('automacoes')">Automações</button>
+    <button class="tabbtn" id="crmbtn-transmissoes" role="tab" aria-selected="false" onclick="switchCrmSub('transmissoes')">Transmissões</button>
   </div>
 
   <div class="subpanel active" id="crmpanel-email">
@@ -1047,6 +1048,29 @@ tbody tr:last-child td{border-bottom:none;}
 
     <div class="section-title" style="margin-top:1.75rem;">Detalhe por automação</div>
     <div class="tablewrap maxh"><table id="table-crm-automacoes"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="crmpanel-transmissoes">
+    <div class="card">
+      <div class="filterbar">
+        <div class="field">
+          <label>Período</label>
+          <button type="button" class="dr-trigger" id="crmtx-daterange-btn"></button>
+          <input type="date" id="crmtx-start" style="display:none;">
+          <input type="date" id="crmtx-end" style="display:none;">
+        </div>
+        <span class="hint" id="crmtx-compare-hint"></span>
+      </div>
+    </div>
+    <p class="footnote" style="margin-top:-6px;">Disparos únicos de e-mail (campanhas pontuais) marcados com utm_content=transmissao, dentro do canal CRM. Cada linha da tabela é uma transmissão distinta (pelo nome da campanha/utm_campaign).</p>
+
+    <div class="kpirow" id="crmtx-kpirow"></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Sessões e receita ao longo do tempo</div>
+    <div class="chartwrap" id="chartwrap-crmtx" style="height:320px;"><canvas id="chart-crmtx" role="img" aria-label="Sessões, pedidos e receita das transmissões ao longo do tempo"></canvas></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Detalhe por transmissão</div>
+    <div class="tablewrap maxh"><table id="table-crm-transmissoes"><thead></thead><tbody></tbody></table></div>
   </div>
 </div>
 
@@ -1113,7 +1137,7 @@ function switchVendasSub(name){
 }
 
 function switchCrmSub(name){
-  ['email','automacoes'].forEach(n=>{
+  ['email','automacoes','transmissoes'].forEach(n=>{
     document.getElementById('crmpanel-'+n).classList.toggle('active', n===name);
     document.getElementById('crmbtn-'+n).setAttribute('aria-selected', n===name);
   });
@@ -2583,6 +2607,97 @@ if(crmAutoMaxDate){
   [crmAutoStartInput, crmAutoEndInput].forEach(el=>el.addEventListener('change', renderCrmAuto));
 }
 renderCrmAuto();
+
+/* ---------------- TOP TAB: CRM > TRANSMISSÕES ---------------- */
+
+const crmTransmissoesRows = DATA.crm_transmissoes_rows || []; // [data, transmissao, sessoes, pedidos, receita]
+const crmTxDates = Array.from(new Set(crmTransmissoesRows.map(r=>r[0]))).sort();
+const crmTxMinDate = crmTxDates[0], crmTxMaxDate = crmTxDates[crmTxDates.length-1];
+
+const crmTxStartInput = document.getElementById('crmtx-start');
+const crmTxEndInput = document.getElementById('crmtx-end');
+let crmTxChart = null;
+
+const CRM_TRANSMISSOES_COLUMNS = [
+  {key:'origem', label:'Transmissão', type:'text', format:r=>r.origem||'(not set)', sortValue:r=>r.origem},
+  {key:'sessoes', label:'Sessões', type:'number', format:r=>fmtInt.format(r.sessoes), sortValue:r=>r.sessoes},
+  {key:'pedidos', label:'Pedidos', type:'number', format:r=>fmtInt.format(r.pedidos), sortValue:r=>r.pedidos},
+  {key:'receita', label:'Faturamento', type:'number', format:r=>fmtBRL.format(r.receita), sortValue:r=>r.receita},
+  {key:'conversao', label:'Taxa de conversão', type:'number', format:r=>fmtPctPlain(r.conversao), sortValue:r=>r.conversao},
+];
+
+if(crmTxMaxDate){
+  crmTxStartInput.min = crmTxMinDate; crmTxEndInput.min = crmTxMinDate;
+  crmTxStartInput.max = crmTxMaxDate; crmTxEndInput.max = crmTxMaxDate;
+  let crmTxDefStart = fpStartInput.value < crmTxMinDate ? crmTxMinDate : fpStartInput.value;
+  let crmTxDefEnd = fpEndInput.value > crmTxMaxDate ? crmTxMaxDate : fpEndInput.value;
+  if(crmTxDefEnd < crmTxDefStart){ crmTxDefStart = crmTxMinDate; crmTxDefEnd = crmTxMaxDate; }
+  crmTxStartInput.value = crmTxDefStart;
+  crmTxEndInput.value = crmTxDefEnd;
+  initDateRangePicker('crmtx-daterange-btn', 'crmtx-start', 'crmtx-end');
+}
+
+function renderCrmTx(){
+  if(!crmTxMaxDate){
+    document.getElementById('crmtx-kpirow').innerHTML = '<div class="emptystate">Ainda não há sessões com utm_content=transmissao registradas no GA4.</div>';
+    document.getElementById('crmtx-compare-hint').textContent = '';
+    renderSortableTable('table-crm-transmissoes', CRM_TRANSMISSOES_COLUMNS, [], 'Sem dados ainda.');
+    return;
+  }
+  const start = crmTxStartInput.value, end = crmTxEndInput.value;
+  if(!start || !end) return;
+
+  const cur = crmAgg(crmTransmissoesRows, start, end);
+  const dur = dayDiff(start,end)+1;
+  const prevEnd = addDays(start,-1);
+  const prevStart = addDays(prevEnd, -(dur-1));
+  const prev = crmAgg(crmTransmissoesRows, prevStart, prevEnd);
+
+  const convCur = cur.sessions>0 ? cur.orders/cur.sessions*100 : 0;
+  const convPrev = prev.sessions>0 ? prev.orders/prev.sessions*100 : 0;
+
+  document.getElementById('crmtx-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Sessões</p><p class="value">${fmtInt.format(cur.sessions)}</p>${crmDeltaHTML(cur.sessions, prev.sessions)}</div>
+    <div class="kpi"><p class="label">Pedidos</p><p class="value">${fmtInt.format(cur.orders)}</p>${crmDeltaHTML(cur.orders, prev.orders)}</div>
+    <div class="kpi"><p class="label">Faturamento</p><p class="value">${fmtBRL.format(cur.revenue)}</p>${crmDeltaHTML(cur.revenue, prev.revenue)}</div>
+    <div class="kpi"><p class="label">Taxa de conversão</p><p class="value">${fmtPctPlain(convCur)}</p>${crmDeltaHTML(convCur, convPrev)}</div>
+  `;
+  document.getElementById('crmtx-compare-hint').textContent = comparePeriodText(start, end);
+
+  if(typeof Chart !== 'undefined'){
+    const labels = cur.series.map(r=>r[0]);
+    if(crmTxChart) crmTxChart.destroy();
+    const ctx = document.getElementById('chart-crmtx');
+    crmTxChart = new Chart(ctx, {
+      data:{
+        labels,
+        datasets:[
+          {type:'line', label:'Sessões', data:cur.series.map(r=>r[1]), yAxisID:'y', borderColor:seriesColor(0), backgroundColor:seriesColor(0), borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15},
+          {type:'line', label:'Faturamento', data:cur.series.map(r=>r[3]), yAxisID:'y1', borderColor:seriesColor(1), backgroundColor:seriesColor(1), borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15},
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index', intersect:false},
+        plugins:{ legend:{position:'top', labels:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-primary')}},
+          tooltip:{ callbacks:{ label:(c)=> c.dataset.label+': '+(c.dataset.label==='Faturamento'?fmtBRL.format(c.parsed.y):fmtInt.format(c.parsed.y)) } }
+        },
+        scales:{
+          x:{grid:{display:false}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted'), maxRotation:0, autoSkip:true}},
+          y:{position:'left', grid:{color:getComputedStyle(document.documentElement).getPropertyValue('--grid')}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted')}},
+          y1:{position:'right', grid:{display:false}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted'), callback:(v)=>fmtBRL.format(v)}},
+        }
+      }
+    });
+  }
+
+  renderSortableTable('table-crm-transmissoes', CRM_TRANSMISSOES_COLUMNS, cur.origemRows, 'Sem sessões no período.');
+}
+attachSort('table-crm-transmissoes', renderCrmTx);
+if(crmTxMaxDate){
+  [crmTxStartInput, crmTxEndInput].forEach(el=>el.addEventListener('change', renderCrmTx));
+}
+renderCrmTx();
 
 /* ---------------- TAB 2: ESTOQUE POR DIA ---------------- */
 
