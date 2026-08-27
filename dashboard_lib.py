@@ -65,6 +65,7 @@ STATE_FILES = [
     "estoque_deposito.json",
     "expedicao.json",
     "github_config.json",
+    "historico_crm_automacoes.csv",
     "historico_crm_canal.csv",
     "historico_descontos.csv",
     "historico_estoque_eventos.csv",
@@ -776,6 +777,71 @@ def fetch_crm_channel_data(days=400):
 
     print(f"[crm-canal] {len(rows)} linhas salvas (ultimos {days} dias) | "
           f"canal = origem/midia contem 'mail' e nao contem 'referral'")
+    return rows
+
+
+# ---------------- PARTE 2H: AUTOMACOES DE E-MAIL (GA4, via utm_content) ----------------
+# Dentro do canal CRM, separa o que e automacao (utm_content=automacao,
+# configurado na Bevean) do que e disparo unico. Por dia e por nome de
+# campanha (utm_campaign), pra o frontend distinguir cada automacao ativa.
+
+def fetch_crm_automacoes_data(days=400):
+    from google.oauth2 import service_account
+    import google.auth.transport.requests
+
+    creds = service_account.Credentials.from_service_account_file(
+        GOOGLE_SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/analytics.readonly"]
+    )
+    creds.refresh(google.auth.transport.requests.Request())
+    headers = {"Authorization": f"Bearer {creds.token}", "Content-Type": "application/json"}
+
+    body = json.dumps({
+        "dateRanges": [{"startDate": f"{days}daysAgo", "endDate": "today"}],
+        "dimensions": [{"name": "date"}, {"name": "sessionCampaignName"}],
+        "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}],
+        "dimensionFilter": {"andGroup": {"expressions": [
+            {"filter": {
+                "fieldName": "sessionSourceMedium",
+                "stringFilter": {"matchType": "CONTAINS", "value": "mail", "caseSensitive": False},
+            }},
+            {"notExpression": {"filter": {
+                "fieldName": "sessionSourceMedium",
+                "stringFilter": {"matchType": "CONTAINS", "value": "referral", "caseSensitive": False},
+            }}},
+            {"filter": {
+                "fieldName": "sessionManualAdContent",
+                "stringFilter": {"matchType": "CONTAINS", "value": "automacao", "caseSensitive": False},
+            }},
+        ]}},
+        "limit": 100000,
+    }).encode()
+    req = urllib.request.Request(
+        f"https://analyticsdata.googleapis.com/v1beta/properties/{GA4_PROPERTY_ID}:runReport",
+        data=body, method="POST", headers=headers,
+    )
+    data = _urlopen_json_retry(req)
+
+    rows = []
+    for row in data.get("rows", []):
+        date_raw = row["dimensionValues"][0]["value"]  # YYYYMMDD
+        campanha = row["dimensionValues"][1]["value"]
+        sessions = int(row["metricValues"][0]["value"])
+        transactions = int(row["metricValues"][1]["value"])
+        revenue = float(row["metricValues"][2]["value"])
+        rows.append([f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}", campanha,
+                     sessions, transactions, round(revenue, 2)])
+    rows.sort(key=lambda r: r[0])
+
+    csv_path = os.path.join(BASE_DIR, "historico_crm_automacoes.csv")
+    tmp_path = csv_path + f".tmp{os.getpid()}"
+    with open(tmp_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["data", "automacao", "sessoes", "pedidos", "receita"])
+        writer.writerows(rows)
+    os.replace(tmp_path, csv_path)
+
+    print(f"[crm-automacoes] {len(rows)} linhas salvas (ultimos {days} dias) | "
+          f"filtro: canal CRM + utm_content contem 'automacao'")
     return rows
 
 
@@ -2049,6 +2115,13 @@ def build_dashboard_data():
             crm_canal_rows = [[r["data"], r["origem_midia"], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])]
                                for r in csv.DictReader(f)]
 
+    crm_automacoes_path = os.path.join(BASE_DIR, "historico_crm_automacoes.csv")
+    crm_automacoes_rows = []
+    if os.path.isfile(crm_automacoes_path):
+        with open(crm_automacoes_path, encoding="utf-8") as f:
+            crm_automacoes_rows = [[r["data"], r["automacao"], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])]
+                                    for r in csv.DictReader(f)]
+
     for r in stock_sku:
         r["estoque"] = int(r["estoque"])
         r["disponivel"] = r["disponivel"] == "True"
@@ -2128,6 +2201,7 @@ def build_dashboard_data():
         "sales_names": sales["names"],
         "pageviews_rows": pageviews_rows,
         "crm_canal_rows": crm_canal_rows,
+        "crm_automacoes_rows": crm_automacoes_rows,
         "stock_sku": stock_sku,
         "discounts": discounts,
         "orders_raw": orders_raw,

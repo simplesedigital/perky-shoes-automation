@@ -999,6 +999,7 @@ tbody tr:last-child td{border-bottom:none;}
 <div class="panel" id="toppanel-crm">
   <div class="tabbar sub" role="tablist">
     <button class="tabbtn" id="crmbtn-email" role="tab" aria-selected="true" onclick="switchCrmSub('email')">Canal E-mail</button>
+    <button class="tabbtn" id="crmbtn-automacoes" role="tab" aria-selected="false" onclick="switchCrmSub('automacoes')">Automações</button>
   </div>
 
   <div class="subpanel active" id="crmpanel-email">
@@ -1023,6 +1024,29 @@ tbody tr:last-child td{border-bottom:none;}
     <div class="section-title" style="margin-top:1.75rem;">Detalhe por origem/mídia</div>
     <p class="footnote" style="margin-top:-6px;">Quebra do canal CRM pelas origens/mídias reais do GA4 que caem nele (e-mail marketing, Mailchimp, newsletters, etc), no período selecionado acima.</p>
     <div class="tablewrap maxh"><table id="table-crm-origem"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="crmpanel-automacoes">
+    <div class="card">
+      <div class="filterbar">
+        <div class="field">
+          <label>Período</label>
+          <button type="button" class="dr-trigger" id="crmauto-daterange-btn"></button>
+          <input type="date" id="crmauto-start" style="display:none;">
+          <input type="date" id="crmauto-end" style="display:none;">
+        </div>
+        <span class="hint" id="crmauto-compare-hint"></span>
+      </div>
+    </div>
+    <p class="footnote" style="margin-top:-6px;">Automações de e-mail (Bevean) marcadas com utm_content=automacao, dentro do canal CRM. Cada linha da tabela é uma automação distinta (pelo nome da campanha/utm_campaign).</p>
+
+    <div class="kpirow" id="crmauto-kpirow"></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Sessões e receita ao longo do tempo</div>
+    <div class="chartwrap" id="chartwrap-crmauto" style="height:320px;"><canvas id="chart-crmauto" role="img" aria-label="Sessões, pedidos e receita das automações ao longo do tempo"></canvas></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Detalhe por automação</div>
+    <div class="tablewrap maxh"><table id="table-crm-automacoes"><thead></thead><tbody></tbody></table></div>
   </div>
 </div>
 
@@ -1089,7 +1113,7 @@ function switchVendasSub(name){
 }
 
 function switchCrmSub(name){
-  ['email'].forEach(n=>{
+  ['email','automacoes'].forEach(n=>{
     document.getElementById('crmpanel-'+n).classList.toggle('active', n===name);
     document.getElementById('crmbtn-'+n).setAttribute('aria-selected', n===name);
   });
@@ -2366,11 +2390,11 @@ if(crmMaxDate){
   initDateRangePicker('crm-daterange-btn', 'crm-start', 'crm-end');
 }
 
-function crmAgg(start, end){
+function crmAgg(rows, start, end){
   let sessions=0, orders=0, revenue=0;
   const byDate = new Map(); // data -> {sessions, orders, revenue}
-  const byOrigem = new Map(); // origem/midia -> {sessions, orders, revenue}
-  for(const r of crmCanalRows){
+  const byOrigem = new Map(); // 2a dimensao (origem/midia ou nome da automacao) -> {sessions, orders, revenue}
+  for(const r of rows){
     const [d, origem, s, o, rev] = r;
     if(d<start || d>end) continue;
     sessions += s; orders += o; revenue += rev;
@@ -2390,6 +2414,14 @@ function crmAgg(start, end){
   return {sessions, orders, revenue, series, origemRows};
 }
 
+function crmDeltaHTML(curV, prevV){
+  if(!prevV) return '<span class="delta flat">sem base de comparação</span>';
+  const t = (curV-prevV)/prevV*100;
+  const cls = t>0.5?'up':(t<-0.5?'down':'flat');
+  const arrow = t>0.5?'&#8599;':(t<-0.5?'&#8600;':'&#8594;');
+  return `<span class="delta ${cls}">${arrow} ${fmtPct(t)} vs período anterior</span>`;
+}
+
 const CRM_ORIGEM_COLUMNS = [
   {key:'origem', label:'Origem / Mídia', type:'text', format:r=>r.origem||'(not set)', sortValue:r=>r.origem},
   {key:'sessoes', label:'Sessões', type:'number', format:r=>fmtInt.format(r.sessoes), sortValue:r=>r.sessoes},
@@ -2402,28 +2434,20 @@ function renderCrm(){
   const start = crmStartInput.value, end = crmEndInput.value;
   if(!start || !end) return;
 
-  const cur = crmAgg(start, end);
+  const cur = crmAgg(crmCanalRows, start, end);
   const dur = dayDiff(start,end)+1;
   const prevEnd = addDays(start,-1);
   const prevStart = addDays(prevEnd, -(dur-1));
-  const prev = crmAgg(prevStart, prevEnd);
+  const prev = crmAgg(crmCanalRows, prevStart, prevEnd);
 
   const convCur = cur.sessions>0 ? cur.orders/cur.sessions*100 : 0;
   const convPrev = prev.sessions>0 ? prev.orders/prev.sessions*100 : 0;
 
-  function deltaHTML(curV, prevV){
-    if(!prevV) return '<span class="delta flat">sem base de comparação</span>';
-    const t = (curV-prevV)/prevV*100;
-    const cls = t>0.5?'up':(t<-0.5?'down':'flat');
-    const arrow = t>0.5?'&#8599;':(t<-0.5?'&#8600;':'&#8594;');
-    return `<span class="delta ${cls}">${arrow} ${fmtPct(t)} vs período anterior</span>`;
-  }
-
   document.getElementById('crm-kpirow').innerHTML = `
-    <div class="kpi"><p class="label">Sessões (canal e-mail)</p><p class="value">${fmtInt.format(cur.sessions)}</p>${deltaHTML(cur.sessions, prev.sessions)}</div>
-    <div class="kpi"><p class="label">Pedidos</p><p class="value">${fmtInt.format(cur.orders)}</p>${deltaHTML(cur.orders, prev.orders)}</div>
-    <div class="kpi"><p class="label">Faturamento</p><p class="value">${fmtBRL.format(cur.revenue)}</p>${deltaHTML(cur.revenue, prev.revenue)}</div>
-    <div class="kpi"><p class="label">Taxa de conversão</p><p class="value">${fmtPctPlain(convCur)}</p>${deltaHTML(convCur, convPrev)}</div>
+    <div class="kpi"><p class="label">Sessões (canal e-mail)</p><p class="value">${fmtInt.format(cur.sessions)}</p>${crmDeltaHTML(cur.sessions, prev.sessions)}</div>
+    <div class="kpi"><p class="label">Pedidos</p><p class="value">${fmtInt.format(cur.orders)}</p>${crmDeltaHTML(cur.orders, prev.orders)}</div>
+    <div class="kpi"><p class="label">Faturamento</p><p class="value">${fmtBRL.format(cur.revenue)}</p>${crmDeltaHTML(cur.revenue, prev.revenue)}</div>
+    <div class="kpi"><p class="label">Taxa de conversão</p><p class="value">${fmtPctPlain(convCur)}</p>${crmDeltaHTML(convCur, convPrev)}</div>
   `;
   document.getElementById('crm-compare-hint').textContent = comparePeriodText(start, end);
 
@@ -2461,6 +2485,94 @@ if(crmMaxDate){
   [crmStartInput, crmEndInput].forEach(el=>el.addEventListener('change', renderCrm));
   renderCrm();
 }
+
+/* ---------------- TOP TAB: CRM > AUTOMAÇÕES ---------------- */
+
+const crmAutomacoesRows = DATA.crm_automacoes_rows || []; // [data, automacao, sessoes, pedidos, receita]
+const crmAutoDates = Array.from(new Set(crmAutomacoesRows.map(r=>r[0]))).sort();
+const crmAutoMinDate = crmAutoDates[0], crmAutoMaxDate = crmAutoDates[crmAutoDates.length-1];
+
+const crmAutoStartInput = document.getElementById('crmauto-start');
+const crmAutoEndInput = document.getElementById('crmauto-end');
+let crmAutoChart = null;
+
+const CRM_AUTOMACOES_COLUMNS = [
+  {key:'origem', label:'Automação', type:'text', format:r=>r.origem||'(not set)', sortValue:r=>r.origem},
+  {key:'sessoes', label:'Sessões', type:'number', format:r=>fmtInt.format(r.sessoes), sortValue:r=>r.sessoes},
+  {key:'pedidos', label:'Pedidos', type:'number', format:r=>fmtInt.format(r.pedidos), sortValue:r=>r.pedidos},
+  {key:'receita', label:'Faturamento', type:'number', format:r=>fmtBRL.format(r.receita), sortValue:r=>r.receita},
+  {key:'conversao', label:'Taxa de conversão', type:'number', format:r=>fmtPctPlain(r.conversao), sortValue:r=>r.conversao},
+];
+
+if(crmAutoMaxDate){
+  crmAutoStartInput.min = crmAutoMinDate; crmAutoEndInput.min = crmAutoMinDate;
+  crmAutoStartInput.max = crmAutoMaxDate; crmAutoEndInput.max = crmAutoMaxDate;
+  crmAutoStartInput.value = fpStartInput.value < crmAutoMinDate ? crmAutoMinDate : fpStartInput.value;
+  crmAutoEndInput.value = fpEndInput.value > crmAutoMaxDate ? crmAutoMaxDate : fpEndInput.value;
+  initDateRangePicker('crmauto-daterange-btn', 'crmauto-start', 'crmauto-end');
+}
+
+function renderCrmAuto(){
+  if(!crmAutoMaxDate){
+    document.getElementById('crmauto-kpirow').innerHTML = '<div class="emptystate">Ainda não há sessões com utm_content=automacao registradas no GA4.</div>';
+    document.getElementById('crmauto-compare-hint').textContent = '';
+    renderSortableTable('table-crm-automacoes', CRM_AUTOMACOES_COLUMNS, [], 'Sem dados ainda.');
+    return;
+  }
+  const start = crmAutoStartInput.value, end = crmAutoEndInput.value;
+  if(!start || !end) return;
+
+  const cur = crmAgg(crmAutomacoesRows, start, end);
+  const dur = dayDiff(start,end)+1;
+  const prevEnd = addDays(start,-1);
+  const prevStart = addDays(prevEnd, -(dur-1));
+  const prev = crmAgg(crmAutomacoesRows, prevStart, prevEnd);
+
+  const convCur = cur.sessions>0 ? cur.orders/cur.sessions*100 : 0;
+  const convPrev = prev.sessions>0 ? prev.orders/prev.sessions*100 : 0;
+
+  document.getElementById('crmauto-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Sessões</p><p class="value">${fmtInt.format(cur.sessions)}</p>${crmDeltaHTML(cur.sessions, prev.sessions)}</div>
+    <div class="kpi"><p class="label">Pedidos</p><p class="value">${fmtInt.format(cur.orders)}</p>${crmDeltaHTML(cur.orders, prev.orders)}</div>
+    <div class="kpi"><p class="label">Faturamento</p><p class="value">${fmtBRL.format(cur.revenue)}</p>${crmDeltaHTML(cur.revenue, prev.revenue)}</div>
+    <div class="kpi"><p class="label">Taxa de conversão</p><p class="value">${fmtPctPlain(convCur)}</p>${crmDeltaHTML(convCur, convPrev)}</div>
+  `;
+  document.getElementById('crmauto-compare-hint').textContent = comparePeriodText(start, end);
+
+  if(typeof Chart !== 'undefined'){
+    const labels = cur.series.map(r=>r[0]);
+    if(crmAutoChart) crmAutoChart.destroy();
+    const ctx = document.getElementById('chart-crmauto');
+    crmAutoChart = new Chart(ctx, {
+      data:{
+        labels,
+        datasets:[
+          {type:'line', label:'Sessões', data:cur.series.map(r=>r[1]), yAxisID:'y', borderColor:seriesColor(0), backgroundColor:seriesColor(0), borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15},
+          {type:'line', label:'Faturamento', data:cur.series.map(r=>r[3]), yAxisID:'y1', borderColor:seriesColor(1), backgroundColor:seriesColor(1), borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15},
+        ]
+      },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        interaction:{mode:'index', intersect:false},
+        plugins:{ legend:{position:'top', labels:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-primary')}},
+          tooltip:{ callbacks:{ label:(c)=> c.dataset.label+': '+(c.dataset.label==='Faturamento'?fmtBRL.format(c.parsed.y):fmtInt.format(c.parsed.y)) } }
+        },
+        scales:{
+          x:{grid:{display:false}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted'), maxRotation:0, autoSkip:true}},
+          y:{position:'left', grid:{color:getComputedStyle(document.documentElement).getPropertyValue('--grid')}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted')}},
+          y1:{position:'right', grid:{display:false}, ticks:{color:getComputedStyle(document.documentElement).getPropertyValue('--text-muted'), callback:(v)=>fmtBRL.format(v)}},
+        }
+      }
+    });
+  }
+
+  renderSortableTable('table-crm-automacoes', CRM_AUTOMACOES_COLUMNS, cur.origemRows, 'Sem sessões no período.');
+}
+attachSort('table-crm-automacoes', renderCrmAuto);
+if(crmAutoMaxDate){
+  [crmAutoStartInput, crmAutoEndInput].forEach(el=>el.addEventListener('change', renderCrmAuto));
+}
+renderCrmAuto();
 
 /* ---------------- TAB 2: ESTOQUE POR DIA ---------------- */
 
