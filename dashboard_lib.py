@@ -899,16 +899,10 @@ def fetch_crm_transmissoes_data(days=400):
                 "fieldName": "sessionSourceMedium",
                 "stringFilter": {"matchType": "CONTAINS", "value": "referral", "caseSensitive": False},
             }}},
-            {"orGroup": {"expressions": [
-                {"filter": {
-                    "fieldName": "sessionManualAdContent",
-                    "stringFilter": {"matchType": "CONTAINS", "value": "transmissao", "caseSensitive": False},
-                }},
-                {"filter": {
-                    "fieldName": "sessionCampaignName",
-                    "stringFilter": {"matchType": "CONTAINS", "value": "transmiss", "caseSensitive": False},
-                }},
-            ]}},
+            {"filter": {
+                "fieldName": "sessionCampaignName",
+                "stringFilter": {"matchType": "CONTAINS", "value": "transmiss", "caseSensitive": False},
+            }},
         ]}},
         "limit": 100000,
     }).encode()
@@ -919,11 +913,14 @@ def fetch_crm_transmissoes_data(days=400):
     data = _urlopen_json_retry(req)
 
     def limpa_nome(nome_bruto):
+        """So reconhece o padrao exato "transmiss[a/ã]o" + 1+ tracos + slug.
+        Campanhas com "transmiss" em outro lugar do nome (sem seguir esse
+        padrao) sao descartadas - nao aparecem na tabela nem no grafico."""
         m = re.match(r"^transmiss[aã]o-+(.+)$", nome_bruto.strip(), re.IGNORECASE)
         if m:
             slug = m.group(1).strip()
             return slug, f"Transmissão - {slug}"
-        return None, nome_bruto
+        return None, None
 
     rows_raw = []
     slugs_vistos = set()
@@ -934,8 +931,9 @@ def fetch_crm_transmissoes_data(days=400):
         transactions = int(row["metricValues"][1]["value"])
         revenue = float(row["metricValues"][2]["value"])
         slug, nome_exibicao = limpa_nome(campanha_bruta)
-        if slug:
-            slugs_vistos.add(slug)
+        if not slug:
+            continue  # nao bate no padrao "transmiss[ao]-tracos-slug" - fora da tabela
+        slugs_vistos.add(slug)
         rows_raw.append([f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}", nome_exibicao, slug,
                           sessions, transactions, round(revenue, 2)])
     rows_raw.sort(key=lambda r: r[0])
