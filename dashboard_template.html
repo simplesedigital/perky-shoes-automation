@@ -1020,6 +1020,13 @@ tbody tr:last-child td{border-bottom:none;}
     <div class="kpirow" id="crm-kpirow"></div>
 
     <div class="section-title" style="margin-top:1.75rem;">Sessões e receita ao longo do tempo</div>
+    <div class="controls-row">
+      <div class="seg" id="seg-gran-crm">
+        <button aria-pressed="true" data-v="day">Dia</button>
+        <button aria-pressed="false" data-v="week">Semana</button>
+        <button aria-pressed="false" data-v="month">Mês</button>
+      </div>
+    </div>
     <div class="chartwrap" id="chartwrap-crm" style="height:320px;"><canvas id="chart-crm" role="img" aria-label="Sessões, pedidos e receita do canal CRM ao longo do tempo"></canvas></div>
 
     <div class="section-title" style="margin-top:1.75rem;">Detalhe por origem/mídia</div>
@@ -1044,6 +1051,13 @@ tbody tr:last-child td{border-bottom:none;}
     <div class="kpirow" id="crmauto-kpirow"></div>
 
     <div class="section-title" style="margin-top:1.75rem;">Sessões e receita ao longo do tempo</div>
+    <div class="controls-row">
+      <div class="seg" id="seg-gran-crmauto">
+        <button aria-pressed="true" data-v="day">Dia</button>
+        <button aria-pressed="false" data-v="week">Semana</button>
+        <button aria-pressed="false" data-v="month">Mês</button>
+      </div>
+    </div>
     <div class="chartwrap" id="chartwrap-crmauto" style="height:320px;"><canvas id="chart-crmauto" role="img" aria-label="Sessões, pedidos e receita das automações ao longo do tempo"></canvas></div>
 
     <div class="section-title" style="margin-top:1.75rem;">Detalhe por automação</div>
@@ -1067,6 +1081,13 @@ tbody tr:last-child td{border-bottom:none;}
     <div class="kpirow" id="crmtx-kpirow"></div>
 
     <div class="section-title" style="margin-top:1.75rem;">Sessões e receita ao longo do tempo</div>
+    <div class="controls-row">
+      <div class="seg" id="seg-gran-crmtx">
+        <button aria-pressed="true" data-v="day">Dia</button>
+        <button aria-pressed="false" data-v="week">Semana</button>
+        <button aria-pressed="false" data-v="month">Mês</button>
+      </div>
+    </div>
     <div class="chartwrap" id="chartwrap-crmtx" style="height:320px;"><canvas id="chart-crmtx" role="img" aria-label="Sessões, pedidos e receita das transmissões ao longo do tempo"></canvas></div>
 
     <div class="section-title" style="margin-top:1.75rem;">Detalhe por transmissão</div>
@@ -2417,7 +2438,7 @@ if(crmMaxDate){
   initDateRangePicker('crm-daterange-btn', 'crm-start', 'crm-end');
 }
 
-function crmAgg(rows, start, end){
+function crmAgg(rows, start, end, gran){
   let sessions=0, orders=0, revenue=0, contacts=0, hasContacts=false, cupomPedidos=0, cupomReceita=0, hasCupom=false;
   const byDate = new Map(); // data -> {sessions, orders, revenue, contacts, cupomPedidos, cupomReceita}
   const byOrigem = new Map(); // 2a dimensao (origem/midia ou nome da automacao) -> {sessions, orders, revenue, contacts, hasContacts, cupomPedidos, cupomReceita, hasCupom}
@@ -2438,7 +2459,16 @@ function crmAgg(rows, start, end){
       bo.cupomPedidos += cupomPed; bo.cupomReceita += cupomRec; bo.hasCupom = true;
     }
   }
-  const series = Array.from(byDate.entries()).sort((a,b)=> a[0]<b[0]?-1:1)
+  const bucketKey = gran==='week' ? isoWeekStart : (gran==='month' ? monthKey : (d=>d));
+  const bucketed = new Map();
+  for(const [d, v] of byDate.entries()){
+    const bk = bucketKey(d);
+    if(!bucketed.has(bk)) bucketed.set(bk, {sessions:0, orders:0, revenue:0, contacts:0, cupomPedidos:0, cupomReceita:0});
+    const b = bucketed.get(bk);
+    b.sessions += v.sessions; b.orders += v.orders; b.revenue += v.revenue;
+    b.contacts += v.contacts; b.cupomPedidos += v.cupomPedidos; b.cupomReceita += v.cupomReceita;
+  }
+  const series = Array.from(bucketed.entries()).sort((a,b)=> a[0]<b[0]?-1:1)
     .map(([d,v])=>[d, v.sessions, v.orders, v.revenue, v.contacts, v.cupomPedidos, v.cupomReceita]);
   const origemRows = Array.from(byOrigem.entries())
     .map(([origem,v])=>({origem, sessoes:v.sessions, pedidos:v.orders, receita:v.revenue, contatos: v.hasContacts?v.contacts:null,
@@ -2464,11 +2494,14 @@ const CRM_ORIGEM_COLUMNS = [
   {key:'conversao', label:'Taxa de conversão', type:'number', format:r=>fmtPctPlain(r.conversao), sortValue:r=>r.conversao},
 ];
 
+let granCrm = 'day';
+seg('seg-gran-crm', v=>{granCrm=v; renderCrm();});
+
 function renderCrm(){
   const start = crmStartInput.value, end = crmEndInput.value;
   if(!start || !end) return;
 
-  const cur = crmAgg(crmCanalRows, start, end);
+  const cur = crmAgg(crmCanalRows, start, end, granCrm);
   const dur = dayDiff(start,end)+1;
   const prevEnd = addDays(start,-1);
   const prevStart = addDays(prevEnd, -(dur-1));
@@ -2552,6 +2585,9 @@ if(crmAutoMaxDate){
   initDateRangePicker('crmauto-daterange-btn', 'crmauto-start', 'crmauto-end');
 }
 
+let granCrmAuto = 'day';
+seg('seg-gran-crmauto', v=>{granCrmAuto=v; renderCrmAuto();});
+
 function renderCrmAuto(){
   if(!crmAutoMaxDate){
     document.getElementById('crmauto-kpirow').innerHTML = '<div class="emptystate">Ainda não há sessões com utm_content=automacao registradas no GA4.</div>';
@@ -2562,7 +2598,7 @@ function renderCrmAuto(){
   const start = crmAutoStartInput.value, end = crmAutoEndInput.value;
   if(!start || !end) return;
 
-  const cur = crmAgg(crmAutomacoesRows, start, end);
+  const cur = crmAgg(crmAutomacoesRows, start, end, granCrmAuto);
   const dur = dayDiff(start,end)+1;
   const prevEnd = addDays(start,-1);
   const prevStart = addDays(prevEnd, -(dur-1));
@@ -2646,6 +2682,9 @@ if(crmTxMaxDate){
   initDateRangePicker('crmtx-daterange-btn', 'crmtx-start', 'crmtx-end');
 }
 
+let granCrmTx = 'day';
+seg('seg-gran-crmtx', v=>{granCrmTx=v; renderCrmTx();});
+
 function renderCrmTx(){
   if(!crmTxMaxDate){
     document.getElementById('crmtx-kpirow').innerHTML = '<div class="emptystate">Ainda não há sessões com utm_content=transmissao registradas no GA4.</div>';
@@ -2656,7 +2695,7 @@ function renderCrmTx(){
   const start = crmTxStartInput.value, end = crmTxEndInput.value;
   if(!start || !end) return;
 
-  const cur = crmAgg(crmTransmissoesRows, start, end);
+  const cur = crmAgg(crmTransmissoesRows, start, end, granCrmTx);
   const dur = dayDiff(start,end)+1;
   const prevEnd = addDays(start,-1);
   const prevStart = addDays(prevEnd, -(dur-1));
