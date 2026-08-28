@@ -1076,7 +1076,7 @@ tbody tr:last-child td{border-bottom:none;}
         <span class="hint" id="crmtx-compare-hint"></span>
       </div>
     </div>
-    <p class="footnote" style="margin-top:-6px;">Disparos únicos de e-mail (campanhas pontuais) marcados com utm_content=transmissao, dentro do canal CRM. Cada linha da tabela é uma transmissão distinta (pelo nome da campanha/utm_campaign).</p>
+    <p class="footnote" style="margin-top:-6px;">Disparos únicos de e-mail (campanhas pontuais), dentro do canal CRM — identificados pelo nome da campanha (utm_campaign) contendo "transmiss" ou por utm_content=transmissao. Quando existe uma promoção na VNDA com "Transmissão" e o mesmo nome da campanha, os pedidos/receita do cupom dela entram nas colunas de cupom.</p>
 
     <div class="kpirow" id="crmtx-kpirow"></div>
 
@@ -2669,6 +2669,8 @@ const CRM_TRANSMISSOES_COLUMNS = [
   {key:'pedidos', label:'Pedidos', type:'number', format:r=>fmtInt.format(r.pedidos), sortValue:r=>r.pedidos},
   {key:'receita', label:'Faturamento', type:'number', format:r=>fmtBRL.format(r.receita), sortValue:r=>r.receita},
   {key:'conversao', label:'Taxa de conversão', type:'number', format:r=>fmtPctPlain(r.conversao), sortValue:r=>r.conversao},
+  {key:'cupomPedidos', label:'Pedidos com cupom', type:'number', format:r=>r.cupomPedidos==null?'—':fmtInt.format(r.cupomPedidos), sortValue:r=>r.cupomPedidos==null?-1:r.cupomPedidos},
+  {key:'cupomReceita', label:'Receita com cupom', type:'number', format:r=>r.cupomReceita==null?'—':fmtBRL.format(r.cupomReceita), sortValue:r=>r.cupomReceita==null?-1:r.cupomReceita},
 ];
 
 if(crmTxMaxDate){
@@ -2709,6 +2711,7 @@ function renderCrmTx(){
     <div class="kpi"><p class="label">Pedidos</p><p class="value">${fmtInt.format(cur.orders)}</p>${crmDeltaHTML(cur.orders, prev.orders)}</div>
     <div class="kpi"><p class="label">Faturamento</p><p class="value">${fmtBRL.format(cur.revenue)}</p>${crmDeltaHTML(cur.revenue, prev.revenue)}</div>
     <div class="kpi"><p class="label">Taxa de conversão</p><p class="value">${fmtPctPlain(convCur)}</p>${crmDeltaHTML(convCur, convPrev)}</div>
+    <div class="kpi"><p class="label">Pedidos com cupom</p><p class="value">${cur.hasCupom?fmtInt.format(cur.cupomPedidos):'—'}</p>${cur.hasCupom?crmDeltaHTML(cur.cupomPedidos, prev.cupomPedidos):'<span class="delta flat">nenhum cupom identificado no período</span>'}</div>
   `;
   document.getElementById('crmtx-compare-hint').textContent = comparePeriodText(start, end);
 

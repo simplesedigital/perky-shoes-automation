@@ -852,8 +852,144 @@ def fetch_crm_automacoes_data(days=400):
     return _fetch_crm_by_utm_content("automacao", "historico_crm_automacoes.csv", "automacao", days)
 
 
+def _fetch_all_discounts():
+    all_discounts = []
+    page = 1
+    while True:
+        d = fetch_with_retry(f"https://api.vnda.com.br/api/v2/discounts?per_page=100&page={page}")
+        if not d:
+            break
+        all_discounts.extend(d)
+        if len(d) < 100:
+            break
+        page += 1
+    return all_discounts
+
+
 def fetch_crm_transmissoes_data(days=400):
-    return _fetch_crm_by_utm_content("transmissao", "historico_crm_transmissoes.csv", "transmissao", days)
+    """Transmissoes (disparos unicos) sao identificadas pelo nome da campanha
+    (sessionCampaignName) contendo "transmiss" - o padrao usado nos envios e
+    "transmissao" + N tracos + slug (N varia, ex: "transmissao---adiosfeirinha"),
+    entao normalizamos pro nome de exibicao "Transmissão - <slug>". Tambem
+    aceita o utm_content=transmissao antigo, pra nao perder envios já
+    marcados desse jeito.
+
+    Pra cada slug encontrado, procura na VNDA uma promocao cujo nome contenha
+    tanto "transmiss" quanto o slug (ex: "[CRM][Bevean][Transmissão] Cupom
+    ADIOSFEIRINHA") e cruza o uso diario do(s) cupom(ns) dessa promocao."""
+    from google.oauth2 import service_account
+    import google.auth.transport.requests
+
+    creds = service_account.Credentials.from_service_account_file(
+        GOOGLE_SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/analytics.readonly"]
+    )
+    creds.refresh(google.auth.transport.requests.Request())
+    headers = {"Authorization": f"Bearer {creds.token}", "Content-Type": "application/json"}
+
+    body = json.dumps({
+        "dateRanges": [{"startDate": f"{days}daysAgo", "endDate": "today"}],
+        "dimensions": [{"name": "date"}, {"name": "sessionCampaignName"}],
+        "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}],
+        "dimensionFilter": {"andGroup": {"expressions": [
+            {"filter": {
+                "fieldName": "sessionSourceMedium",
+                "stringFilter": {"matchType": "CONTAINS", "value": "mail", "caseSensitive": False},
+            }},
+            {"notExpression": {"filter": {
+                "fieldName": "sessionSourceMedium",
+                "stringFilter": {"matchType": "CONTAINS", "value": "referral", "caseSensitive": False},
+            }}},
+            {"orGroup": {"expressions": [
+                {"filter": {
+                    "fieldName": "sessionManualAdContent",
+                    "stringFilter": {"matchType": "CONTAINS", "value": "transmissao", "caseSensitive": False},
+                }},
+                {"filter": {
+                    "fieldName": "sessionCampaignName",
+                    "stringFilter": {"matchType": "CONTAINS", "value": "transmiss", "caseSensitive": False},
+                }},
+            ]}},
+        ]}},
+        "limit": 100000,
+    }).encode()
+    req = urllib.request.Request(
+        f"https://analyticsdata.googleapis.com/v1beta/properties/{GA4_PROPERTY_ID}:runReport",
+        data=body, method="POST", headers=headers,
+    )
+    data = _urlopen_json_retry(req)
+
+    def limpa_nome(nome_bruto):
+        m = re.match(r"^transmiss[aã]o-+(.+)$", nome_bruto.strip(), re.IGNORECASE)
+        if m:
+            slug = m.group(1).strip()
+            return slug, f"Transmissão - {slug}"
+        return None, nome_bruto
+
+    rows_raw = []
+    slugs_vistos = set()
+    for row in data.get("rows", []):
+        date_raw = row["dimensionValues"][0]["value"]  # YYYYMMDD
+        campanha_bruta = row["dimensionValues"][1]["value"]
+        sessions = int(row["metricValues"][0]["value"])
+        transactions = int(row["metricValues"][1]["value"])
+        revenue = float(row["metricValues"][2]["value"])
+        slug, nome_exibicao = limpa_nome(campanha_bruta)
+        if slug:
+            slugs_vistos.add(slug)
+        rows_raw.append([f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}", nome_exibicao, slug,
+                          sessions, transactions, round(revenue, 2)])
+    rows_raw.sort(key=lambda r: r[0])
+
+    # acha o(s) cupom(ns) de cada transmissao: promocao na VNDA cujo nome
+    # contem "transmiss" e o slug
+    cupom_por_slug = {}
+    if slugs_vistos:
+        all_discounts = _fetch_all_discounts()
+        for slug in slugs_vistos:
+            candidatos = [d for d in all_discounts
+                          if "transmiss" in (d.get("name") or "").lower()
+                          and slug.lower() in (d.get("name") or "").lower()]
+            if not candidatos:
+                continue
+            try:
+                coupons = fetch_with_retry(f"https://api.vnda.com.br/api/v2/discounts/{candidatos[0]['id']}/coupons")
+                cupom_por_slug[slug] = [c["code"] for c in coupons]
+            except (urllib.error.HTTPError, RuntimeError):
+                pass
+
+    orders = load_json("orders_master.json", [])
+    codigos_relevantes = {c for codes in cupom_por_slug.values() for c in codes}
+    uso_cupom_por_dia = defaultdict(lambda: defaultdict(lambda: [0, 0.0]))
+    for o in orders:
+        code = o.get("coupon_code")
+        if code in codigos_relevantes and o.get("date"):
+            entry = uso_cupom_por_dia[code][o["date"]]
+            entry[0] += 1
+            entry[1] += round(o.get("total") or 0.0, 2)
+
+    rows = []
+    for d, nome_exibicao, slug, sessions, transactions, revenue in rows_raw:
+        if slug and slug in cupom_por_slug:
+            pedidos_cupom, receita_cupom = 0, 0.0
+            for code in cupom_por_slug[slug]:
+                p, r = uso_cupom_por_dia.get(code, {}).get(d, [0, 0.0])
+                pedidos_cupom += p
+                receita_cupom += r
+        else:
+            pedidos_cupom, receita_cupom = "", ""
+        rows.append([d, nome_exibicao, sessions, transactions, revenue, pedidos_cupom, receita_cupom])
+
+    csv_path = os.path.join(BASE_DIR, "historico_crm_transmissoes.csv")
+    tmp_path = csv_path + f".tmp{os.getpid()}"
+    with open(tmp_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["data", "transmissao", "sessoes", "pedidos", "receita", "cupom_pedidos", "cupom_receita"])
+        writer.writerows(rows)
+    os.replace(tmp_path, csv_path)
+
+    print(f"[crm-transmissoes] {len(rows)} linhas salvas (ultimos {days} dias) | "
+          f"{len(cupom_por_slug)} transmissao(oes) com cupom identificado: {list(cupom_por_slug.keys())}")
+    return rows
 
 
 # ---------------- PARTE 2I: SNAPSHOT DE SEGMENTOS DA BEVEAN ----------------
@@ -2184,8 +2320,13 @@ def build_dashboard_data():
     crm_transmissoes_rows = []
     if os.path.isfile(crm_transmissoes_path):
         with open(crm_transmissoes_path, encoding="utf-8") as f:
-            crm_transmissoes_rows = [[r["data"], r["transmissao"], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])]
-                                      for r in csv.DictReader(f)]
+            for r in csv.DictReader(f):
+                cupom_pedidos = int(r["cupom_pedidos"]) if r.get("cupom_pedidos") else None
+                cupom_receita = float(r["cupom_receita"]) if r.get("cupom_receita") else None
+                # indice 5 (contatos) fica None - conceito nao existe pra transmissoes,
+                # so pra manter a mesma posicao dos campos de cupom que crmAgg() espera
+                crm_transmissoes_rows.append([r["data"], r["transmissao"], int(r["sessoes"]), int(r["pedidos"]),
+                                               float(r["receita"]), None, cupom_pedidos, cupom_receita])
 
     crm_automacoes_path = os.path.join(BASE_DIR, "historico_crm_automacoes.csv")
     ga4_por_campanha_data = {}  # (utm_campaign, data) -> (sessoes, pedidos, receita)
