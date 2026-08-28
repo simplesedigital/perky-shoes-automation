@@ -269,15 +269,26 @@ def update_order_bump(content, yesterday):
     existing_items = parse_array(content, "orderBumpItems")
     last_date = existing_daily[-1]["date"]
     start_date = (datetime.strptime(last_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-    if start_date > yesterday:
-        return content, 0, 0
 
-    token = get_vnda_token()
-    orders = fetch_orders_in_range(token, start_date, yesterday)
-    new_daily, new_items = compute_order_bump_updates(orders)
+    new_daily, new_items = [], []
+    if start_date <= yesterday:
+        token = get_vnda_token()
+        orders = fetch_orders_in_range(token, start_date, yesterday)
+        new_daily, new_items = compute_order_bump_updates(orders)
+        combined_daily = existing_daily + new_daily
+        content = replace_array(content, "orderBumpDaily", combined_daily)
+        content = replace_array(content, "orderBumpItems", existing_items + new_items)
+    else:
+        combined_daily = existing_daily
 
-    content = replace_array(content, "orderBumpDaily", existing_daily + new_daily)
-    content = replace_array(content, "orderBumpItems", existing_items + new_items)
+    content, n = re.subn(
+        r'const ORDERBUMP_LAST_DATE = "[^"]*"',
+        f'const ORDERBUMP_LAST_DATE = "{combined_daily[-1]["date"]}"',
+        content,
+    )
+    if n != 1:
+        raise RuntimeError("Marcador 'ORDERBUMP_LAST_DATE' não encontrado (ou duplicado).")
+
     return content, len(new_daily), len(new_items)
 
 
