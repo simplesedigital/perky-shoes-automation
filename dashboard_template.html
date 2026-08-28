@@ -789,11 +789,13 @@ tbody tr:last-child td{border-bottom:none;}
         </select>
       </div>
       <div class="field">
-        <label for="f-estoque-reposicoes">Estoque atual</label>
+        <label for="f-estoque-reposicoes">Estoque físico
+          <span class="infotip" tabindex="0" role="img" aria-label="Estoque que já está fisicamente no depósito. Para SKUs em pré-venda, o que o site mostra como disponível é a própria reposição ainda não chegada — por isso o físico fica zerado até a chegada.">i<span class="tooltip-box">Estoque que já está fisicamente no depósito. Para SKUs em pré-venda, o que o site mostra como disponível é a própria reposição ainda não chegada — por isso o físico fica zerado até a chegada.</span></span>
+        </label>
         <select id="f-estoque-reposicoes">
           <option value="all">Todos</option>
-          <option value="zero">Sem estoque</option>
-          <option value="com">Com estoque</option>
+          <option value="zero">Sem estoque físico</option>
+          <option value="com">Com estoque físico</option>
         </select>
       </div>
       <div class="field">
@@ -809,7 +811,7 @@ tbody tr:last-child td{border-bottom:none;}
   </div>
   <div class="kpirow" id="reposicoes-kpirow"></div>
   <div class="section-title">Pedidos de reposição em aberto</div>
-  <p class="footnote" style="margin-top:-6px;">SKUs com pedido de reposição já feito ao fornecedor, ordenados pela data de entrega prevista. Dados vêm da planilha de calendário de reposições.</p>
+  <p class="footnote" style="margin-top:-6px;">SKUs com pedido de reposição já feito ao fornecedor, ordenados pela data de entrega prevista. Dados vêm da planilha de calendário de reposições. Para SKUs em pré-venda, "Disponível no site" e "Qtd. a receber" são a mesma mercadoria — o estoque físico real só existe a partir da chegada, por isso as colunas não devem ser somadas.</p>
   <div class="tablewrap maxh"><table id="table-reposicoes"><thead></thead><tbody></tbody></table></div>
 
   <div class="section-title">Vendas antecipadas</div>
@@ -858,7 +860,7 @@ tbody tr:last-child td{border-bottom:none;}
   </div>
   <div class="kpirow" id="compras-kpirow"></div>
   <div class="section-title">Necessidade de compra por SKU</div>
-  <p class="footnote" style="margin-top:-6px;">Considera produtos ativos com grade numérica 33-44 (calçado) ou tamanho único (acessórios), filtrados pela busca acima — grades não numéricas (chinelos em par, calçado infantil) ainda não entram nessa conta. A demanda usada no cálculo soma vendas realizadas + avisos de demanda reprimida ainda não atendidos no período (venda perdida por ruptura de estoque). Necessidade = demanda projetada para o período (lead time + cobertura) − estoque atual − reposição já em pedido, distribuída pela curva de tamanhos quando o produto tem grade, e respeitando o pedido mínimo por produto.</p>
+  <p class="footnote" style="margin-top:-6px;">Considera produtos ativos com grade numérica 33-44 (calçado) ou tamanho único (acessórios), filtrados pela busca acima — grades não numéricas (chinelos em par, calçado infantil) ainda não entram nessa conta. A demanda usada no cálculo soma vendas realizadas + avisos de demanda reprimida ainda não atendidos no período (venda perdida por ruptura de estoque). Necessidade = demanda projetada para o período (lead time + cobertura) − estoque físico − reposição já em pedido, distribuída pela curva de tamanhos quando o produto tem grade, e respeitando o pedido mínimo por produto. Para SKUs em pré-venda, o estoque físico entra como 0 (o que aparece como disponível no site já é a própria reposição), senão a necessidade real de compra ficaria subestimada.</p>
   <div class="tablewrap maxh"><table id="table-compras-sku"><thead></thead><tbody></tbody></table></div>
 </div>
 </div>
@@ -3272,10 +3274,20 @@ function reposicaoStatus(diasAte){
   return {key:'prazo', label:'No prazo', cls:'badge-c'};
 }
 
+function estoqueFisico(sku, estoqueAtual){
+  return presaleSkuSet.has(sku) ? 0 : estoqueAtual;
+}
+
 const REPOSICOES_COLUMNS = [
   {key:'nome', label:'Produto/Referência', type:'text', cellClass:'', format:r=>productCell(r.nome, r.referencia), sortValue:r=>r.nome},
   {key:'sku', label:'Tamanho/SKU', type:'text', cellClass:'', format:r=>sizeCell(tamanhoFromSku(r.sku), r.sku), sortValue:r=>r.sku},
-  {key:'estoque_atual', label:'Estoque atual', type:'number', format:r=>fmtInt.format(r.estoque_atual), sortValue:r=>r.estoque_atual},
+  {key:'estoque_fisico', label:'Estoque físico', type:'number', format:r=>fmtInt.format(estoqueFisico(r.sku, r.estoque_atual)), sortValue:r=>estoqueFisico(r.sku, r.estoque_atual)},
+  {key:'estoque_atual', label:'Disponível no site', type:'number', format:r=>{
+      const disp = presaleSkuSet.has(r.sku)
+        ? `<span class="infotip infotip-plain" tabindex="0" role="img" aria-label="Produto em pré-venda: essa disponibilidade no site é a própria reposição abaixo, ainda não chegou fisicamente.">${fmtInt.format(r.estoque_atual)}<span class="tooltip-box">Produto em pré-venda: essa disponibilidade no site é a própria reposição abaixo, ainda não chegou fisicamente.</span></span>`
+        : fmtInt.format(r.estoque_atual);
+      return disp;
+    }, sortValue:r=>r.estoque_atual},
   {key:'quantidade', label:'Qtd. a receber', type:'number', format:r=>fmtInt.format(r.quantidade), sortValue:r=>r.quantidade},
   {key:'data_prevista', label:'Previsão de chegada', type:'text', format:r=>r.data_prevista.split('-').reverse().join('/'), sortValue:r=>r.data_prevista},
   {key:'status', label:'Status', type:'text', cellClass:'center', format:r=>{
@@ -3291,7 +3303,8 @@ const REPOSICOES_COLUMNS = [
 const PRESALE_COLUMNS = [
   {key:'nome', label:'Produto/Referência', type:'text', cellClass:'', format:r=>productCell(r.nome, r.referencia), sortValue:r=>r.nome},
   {key:'sku', label:'Tamanho/SKU', type:'text', cellClass:'', format:r=>sizeCell(tamanhoFromSku(r.sku), r.sku), sortValue:r=>r.sku},
-  {key:'estoque_atual', label:'Estoque atual', type:'number', format:r=>fmtInt.format(r.estoque_atual), sortValue:r=>r.estoque_atual},
+  {key:'estoque_fisico', label:'Estoque físico', type:'number', format:r=>fmtInt.format(estoqueFisico(r.sku, r.estoque_atual)), sortValue:r=>estoqueFisico(r.sku, r.estoque_atual)},
+  {key:'estoque_atual', label:'Disponível no site (pré-venda)', type:'number', format:r=>fmtInt.format(r.estoque_atual), sortValue:r=>r.estoque_atual},
   {key:'dias_add_frete', label:'Prazo extra de entrega', type:'number', format:r=>`${r.dias_add_frete} dias`, sortValue:r=>r.dias_add_frete},
   {key:'data_chegada', label:'Data de chegada', type:'text', format:r=>r.data_chegada.split('-').reverse().join('/'), sortValue:r=>r.data_chegada},
   {key:'status', label:'Status', type:'text', cellClass:'center', format:r=>{
@@ -3310,8 +3323,8 @@ function renderReposicoes(){
 
   let rows = reposicoesData.map(r=>({...r, _diasAte: dayDiff(today, r.data_prevista)}));
   if(statusVal!=='all') rows = rows.filter(r=> reposicaoStatus(r._diasAte).key===statusVal);
-  if(estoqueVal==='zero') rows = rows.filter(r=> r.estoque_atual===0);
-  else if(estoqueVal==='com') rows = rows.filter(r=> r.estoque_atual>0);
+  if(estoqueVal==='zero') rows = rows.filter(r=> estoqueFisico(r.sku, r.estoque_atual)===0);
+  else if(estoqueVal==='com') rows = rows.filter(r=> estoqueFisico(r.sku, r.estoque_atual)>0);
   rows = rows.filter(r=>matchCategoria(categoriaReposicoesSel, r.referencia));
   if(filterText) rows = rows.filter(r=> matchNameOrCode(filterText, r.nome, r.referencia, r.sku));
   if(!sortState['table-reposicoes']) rows = rows.slice().sort((a,b)=> a.data_prevista.localeCompare(b.data_prevista));
@@ -3330,8 +3343,8 @@ function renderReposicoes(){
 
   let presaleRows = presaleData.map(r=>({...r, _diasAte: dayDiff(today, r.data_chegada)}));
   if(statusVal!=='all') presaleRows = presaleRows.filter(r=> reposicaoStatus(r._diasAte).key===statusVal);
-  if(estoqueVal==='zero') presaleRows = presaleRows.filter(r=> r.estoque_atual===0);
-  else if(estoqueVal==='com') presaleRows = presaleRows.filter(r=> r.estoque_atual>0);
+  if(estoqueVal==='zero') presaleRows = presaleRows.filter(r=> estoqueFisico(r.sku, r.estoque_atual)===0);
+  else if(estoqueVal==='com') presaleRows = presaleRows.filter(r=> estoqueFisico(r.sku, r.estoque_atual)>0);
   if(filterText) presaleRows = presaleRows.filter(r=> matchNameOrCode(filterText, r.nome, r.referencia, r.sku));
   if(!sortState['table-presale']) presaleRows = presaleRows.slice().sort((a,b)=> a.data_chegada.localeCompare(b.data_chegada));
 
@@ -3376,7 +3389,9 @@ function computeComprasBase(){
   skuInfo.forEach(r=>{
     if(!porProduto[r.referencia]) porProduto[r.referencia] = { referencia: r.referencia, nome: r.nome_produto, categoria: r.categoria || 'Sem categoria', skus: [] };
     porProduto[r.referencia].skus.push({
-      sku: r.sku, tamanho: r.tamanho || 'Único', estoque: r.estoque, reposicao: reposPorSku[r.sku]||0,
+      sku: r.sku, tamanho: r.tamanho || 'Único', estoque: r.estoque,
+      fisico: estoqueFisico(r.sku, r.estoque), reposicao: reposPorSku[r.sku]||0,
+      presale: presaleSkuSet.has(r.sku),
     });
   });
 
@@ -3414,7 +3429,7 @@ function computeComprasNecessidade(produtosBase, leadTime, cobertura, moq, janel
       const demandaReprimida = demandaReprimidaNoPeriodo(v.sku, janelaDias);
       return {...v, vendas, demandaReprimida, vendasAjustadas: vendas + demandaReprimida};
     });
-    const estoqueTotal = skus.reduce((s,v)=>s+v.estoque,0);
+    const estoqueTotal = skus.reduce((s,v)=>s+v.fisico,0);
     const reposicaoTotal = skus.reduce((s,v)=>s+v.reposicao,0);
     const vendasTotal = skus.reduce((s,v)=>s+v.vendasAjustadas,0);
     const taxaDiaria = vendasTotal / janelaDias;
@@ -3446,7 +3461,8 @@ function computeComprasNecessidade(produtosBase, leadTime, cobertura, moq, janel
     skus.forEach(v=>{
       linhas.push({
         referencia: p.referencia, nome: p.nome, categoria: p.categoria, sku: v.sku, tamanho: v.tamanho,
-        estoque: v.estoque, vendas: v.vendas, demandaReprimida: v.demandaReprimida, reposicao: v.reposicao,
+        estoque: v.estoque, fisico: v.fisico, presale: v.presale, vendas: v.vendas,
+        demandaReprimida: v.demandaReprimida, reposicao: v.reposicao,
         comprar: comprarPorSku[v.sku] || 0, taxaDiariaProduto: taxaDiaria, estoqueProdutoTotal: estoqueTotal,
       });
     });
@@ -3458,7 +3474,12 @@ const COMPRAS_COLUMNS = [
   {key:'nome', label:'Produto/Referência', type:'text', cellClass:'', format:r=>productCell(r.nome, r.referencia), sortValue:r=>r.nome},
   {key:'categoria', label:'Categoria', type:'text', cellClass:'', format:r=>r.categoria, sortValue:r=>r.categoria},
   {key:'sku', label:'Tamanho/SKU', type:'text', cellClass:'', format:r=>sizeCell(r.tamanho, r.sku), sortValue:r=>r.sku},
-  {key:'estoque', label:'Estoque atual', type:'number', format:r=>fmtInt.format(r.estoque), sortValue:r=>r.estoque},
+  {key:'estoque', label:'Estoque físico', type:'number', format:r=>{
+      const valor = fmtInt.format(r.fisico);
+      return r.presale
+        ? `<span class="infotip infotip-plain" tabindex="0" role="img" aria-label="Em pré-venda: o site mostra ${fmtInt.format(r.estoque)} disponível, mas é a própria reposição ao lado — físico é 0 até chegar.">${valor}<span class="tooltip-box">Em pré-venda: o site mostra ${fmtInt.format(r.estoque)} disponível, mas é a própria reposição ao lado — físico é 0 até chegar.</span></span>`
+        : valor;
+    }, sortValue:r=>r.fisico},
   {key:'vendas', label:'Vendas no período', type:'number', format:r=>fmtInt.format(r.vendas), sortValue:r=>r.vendas},
   {key:'demandaReprimida', label:'Demanda reprimida', type:'number', format:r=>fmtInt.format(r.demandaReprimida), sortValue:r=>r.demandaReprimida},
   {key:'reposicao', label:'Reposição em aberto', type:'number', format:r=>fmtInt.format(r.reposicao), sortValue:r=>r.reposicao},
