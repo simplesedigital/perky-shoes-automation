@@ -2,7 +2,7 @@ name: Atualizacao SEO Yamys
 
 on:
   schedule:
-    - cron: "0 10 * * *"   # 07:00 BRT
+    - cron: "20 10 * * *"   # 07:20 BRT (evita minuto redondo, que conflita com o disparo de 15 em 15 min do sync-pedidos)
   workflow_dispatch: {}
 
 concurrency:
