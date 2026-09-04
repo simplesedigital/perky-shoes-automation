@@ -783,12 +783,17 @@ def fetch_crm_channel_data(days=400):
 
 
 # ---------------- PARTE 2H: AUTOMACOES E TRANSMISSOES DE E-MAIL (GA4, via utm_content) ----------------
-# Dentro do canal CRM, separa por tipo de disparo usando o utm_content
-# configurado na Bevean: "automacao" (fluxo automatico) ou "transmissao"
-# (disparo unico/campanha pontual). Por dia e por nome de campanha
-# (utm_campaign), pra o frontend distinguir cada uma.
+def _slug_para_nome_automacao(slug):
+    """Ex: 'boas-vindas-newsletter' -> 'Boas Vindas Newsletter'."""
+    return " ".join(p.capitalize() for p in re.split(r"[-_]+", slug) if p)
 
-def _fetch_crm_by_utm_content(content_filtro, csv_filename, col_nome, days=400):
+
+def _fetch_ga4_bevean_email_por_campanha(days):
+    """Sessoes com utm_source=bevean + utm_medium=email (exato), por dia e por
+    sessionCampaignName (utm_campaign) - base compartilhada por transmissoes e
+    automacoes, que agora se diferenciam so pelo prefixo no proprio
+    utm_campaign (transmissao_<nome> / automacao_<nome>), nao mais por
+    utm_content."""
     from google.oauth2 import service_account
     import google.auth.transport.requests
 
@@ -804,16 +809,12 @@ def _fetch_crm_by_utm_content(content_filtro, csv_filename, col_nome, days=400):
         "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}],
         "dimensionFilter": {"andGroup": {"expressions": [
             {"filter": {
-                "fieldName": "sessionSourceMedium",
-                "stringFilter": {"matchType": "CONTAINS", "value": "mail", "caseSensitive": False},
+                "fieldName": "sessionSource",
+                "stringFilter": {"matchType": "EXACT", "value": "bevean", "caseSensitive": False},
             }},
-            {"notExpression": {"filter": {
-                "fieldName": "sessionSourceMedium",
-                "stringFilter": {"matchType": "CONTAINS", "value": "referral", "caseSensitive": False},
-            }}},
             {"filter": {
-                "fieldName": "sessionManualAdContent",
-                "stringFilter": {"matchType": "CONTAINS", "value": content_filtro, "caseSensitive": False},
+                "fieldName": "sessionMedium",
+                "stringFilter": {"matchType": "EXACT", "value": "email", "caseSensitive": False},
             }},
         ]}},
         "limit": 100000,
@@ -824,128 +825,29 @@ def _fetch_crm_by_utm_content(content_filtro, csv_filename, col_nome, days=400):
     )
     data = _urlopen_json_retry(req)
 
-    rows = []
-    for row in data.get("rows", []):
-        date_raw = row["dimensionValues"][0]["value"]  # YYYYMMDD
-        campanha = row["dimensionValues"][1]["value"]
-        sessions = int(row["metricValues"][0]["value"])
-        transactions = int(row["metricValues"][1]["value"])
-        revenue = float(row["metricValues"][2]["value"])
-        rows.append([f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}", campanha,
-                     sessions, transactions, round(revenue, 2)])
-    rows.sort(key=lambda r: r[0])
-
-    csv_path = os.path.join(BASE_DIR, csv_filename)
-    tmp_path = csv_path + f".tmp{os.getpid()}"
-    with open(tmp_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["data", col_nome, "sessoes", "pedidos", "receita"])
-        writer.writerows(rows)
-    os.replace(tmp_path, csv_path)
-
-    print(f"[crm-{col_nome}] {len(rows)} linhas salvas (ultimos {days} dias) | "
-          f"filtro: canal CRM + utm_content contem '{content_filtro}'")
-    return rows
-
-
-def fetch_crm_automacoes_data(days=400):
-    return _fetch_crm_by_utm_content("automacao", "historico_crm_automacoes.csv", "automacao", days)
-
-
-def _fetch_all_discounts():
-    all_discounts = []
-    page = 1
-    while True:
-        d = fetch_with_retry(f"https://api.vnda.com.br/api/v2/discounts?per_page=100&page={page}")
-        if not d:
-            break
-        all_discounts.extend(d)
-        if len(d) < 100:
-            break
-        page += 1
-    return all_discounts
-
-
-def fetch_crm_transmissoes_data(days=400):
-    """Transmissoes (disparos unicos) sao identificadas pelo nome da campanha
-    (sessionCampaignName) contendo "transmiss" - o padrao usado nos envios e
-    "transmissao" + N tracos + slug (N varia, ex: "transmissao---adiosfeirinha"),
-    entao normalizamos pro nome de exibicao "Transmissão - <slug>". Tambem
-    aceita o utm_content=transmissao antigo, pra nao perder envios já
-    marcados desse jeito.
-
-    Pra cada slug encontrado, procura na VNDA uma promocao cujo nome contenha
-    tanto "transmiss" quanto o slug (ex: "[CRM][Bevean][Transmissão] Cupom
-    ADIOSFEIRINHA") e cruza o uso diario do(s) cupom(ns) dessa promocao."""
-    from google.oauth2 import service_account
-    import google.auth.transport.requests
-
-    creds = service_account.Credentials.from_service_account_file(
-        GOOGLE_SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/analytics.readonly"]
-    )
-    creds.refresh(google.auth.transport.requests.Request())
-    headers = {"Authorization": f"Bearer {creds.token}", "Content-Type": "application/json"}
-
-    body = json.dumps({
-        "dateRanges": [{"startDate": f"{days}daysAgo", "endDate": "today"}],
-        "dimensions": [{"name": "date"}, {"name": "sessionCampaignName"}],
-        "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}],
-        "dimensionFilter": {"andGroup": {"expressions": [
-            {"filter": {
-                "fieldName": "sessionSourceMedium",
-                "stringFilter": {"matchType": "CONTAINS", "value": "mail", "caseSensitive": False},
-            }},
-            {"notExpression": {"filter": {
-                "fieldName": "sessionSourceMedium",
-                "stringFilter": {"matchType": "CONTAINS", "value": "referral", "caseSensitive": False},
-            }}},
-            {"filter": {
-                "fieldName": "sessionCampaignName",
-                "stringFilter": {"matchType": "CONTAINS", "value": "transmiss", "caseSensitive": False},
-            }},
-        ]}},
-        "limit": 100000,
-    }).encode()
-    req = urllib.request.Request(
-        f"https://analyticsdata.googleapis.com/v1beta/properties/{GA4_PROPERTY_ID}:runReport",
-        data=body, method="POST", headers=headers,
-    )
-    data = _urlopen_json_retry(req)
-
-    def limpa_nome(nome_bruto):
-        """So reconhece o padrao exato "transmiss[a/ã]o" + 1+ tracos + slug.
-        Campanhas com "transmiss" em outro lugar do nome (sem seguir esse
-        padrao) sao descartadas - nao aparecem na tabela nem no grafico."""
-        m = re.match(r"^transmiss[aã]o-+(.+)$", nome_bruto.strip(), re.IGNORECASE)
-        if m:
-            slug = m.group(1).strip()
-            return slug, f"Transmissão - {slug}"
-        return None, None
-
-    rows_raw = []
-    slugs_vistos = set()
+    out = []
     for row in data.get("rows", []):
         date_raw = row["dimensionValues"][0]["value"]  # YYYYMMDD
         campanha_bruta = row["dimensionValues"][1]["value"]
         sessions = int(row["metricValues"][0]["value"])
         transactions = int(row["metricValues"][1]["value"])
         revenue = float(row["metricValues"][2]["value"])
-        slug, nome_exibicao = limpa_nome(campanha_bruta)
-        if not slug:
-            continue  # nao bate no padrao "transmiss[ao]-tracos-slug" - fora da tabela
-        slugs_vistos.add(slug)
-        rows_raw.append([f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}", nome_exibicao, slug,
-                          sessions, transactions, round(revenue, 2)])
-    rows_raw.sort(key=lambda r: r[0])
+        out.append((f"{date_raw[:4]}-{date_raw[4:6]}-{date_raw[6:8]}", campanha_bruta,
+                     sessions, transactions, round(revenue, 2)))
+    return out
 
-    # acha o(s) cupom(ns) de cada transmissao: promocao na VNDA cujo nome
-    # contem "transmiss" e o slug
+
+def _cruza_cupom_por_slug(slugs_vistos, promo_keyword):
+    """Pra cada slug, acha uma promocao ATIVA na VNDA cujo nome contenha
+    promo_keyword (ex: 'transmiss' ou 'automa') e o slug, pega os cupons dela,
+    e devolve (cupom_por_slug, uso_cupom_por_dia) pra cruzar com pedidos."""
     cupom_por_slug = {}
     if slugs_vistos:
         all_discounts = _fetch_all_discounts()
         for slug in slugs_vistos:
             candidatos = [d for d in all_discounts
-                          if "transmiss" in (d.get("name") or "").lower()
+                          if d.get("enabled")
+                          and promo_keyword in (d.get("name") or "").lower()
                           and slug.lower() in (d.get("name") or "").lower()]
             if not candidatos:
                 continue
@@ -964,6 +866,114 @@ def fetch_crm_transmissoes_data(days=400):
             entry = uso_cupom_por_dia[code][o["date"]]
             entry[0] += 1
             entry[1] += round(o.get("total") or 0.0, 2)
+    return cupom_por_slug, uso_cupom_por_dia
+
+
+def fetch_crm_automacoes_data(days=400):
+    """Automacoes (fluxo automatico da Bevean, ex: boas-vindas). utm_campaign
+    precisa seguir o padrao 'automacao_<nome>' (ex: 'automacao_boas-vindas-newsletter')
+    dentro de uma sessao utm_source=bevean + utm_medium=email; cada nome vira
+    uma linha por dia, com o nome de exibicao derivado do slug (ex:
+    'boas-vindas-newsletter' -> 'Boas Vindas Newsletter').
+
+    Pra cada slug encontrado, procura na VNDA uma promocao ATIVA cujo nome
+    contenha tanto "automa" (casa "Automação"/"automacao") quanto o slug (ex:
+    "[CRM][Bevean][Automação][boas-vindas-newsletter] Cupom BOASVINDAS") e cruza
+    o uso diario do(s) cupom(ns) dessa promocao. Automacao sem promocao
+    correspondente fica com cupom_pedidos/cupom_receita em branco."""
+    ga4_rows = _fetch_ga4_bevean_email_por_campanha(days)
+
+    def limpa_nome(nome_bruto):
+        m = re.match(r"^automa[cç][aã]o[-_]+(.+)$", nome_bruto.strip(), re.IGNORECASE)
+        if not m:
+            return None, None
+        slug = m.group(1).strip()
+        return slug, _slug_para_nome_automacao(slug)
+
+    rows_raw = []
+    slugs_vistos = set()
+    for d, campanha_bruta, sessions, transactions, revenue in ga4_rows:
+        slug, nome_exibicao = limpa_nome(campanha_bruta)
+        if not slug:
+            continue  # nao bate no padrao "automacao_<nome>" - fora da tabela
+        slugs_vistos.add(slug)
+        rows_raw.append([d, slug, nome_exibicao, sessions, transactions, revenue])
+    rows_raw.sort(key=lambda r: r[0])
+
+    cupom_por_slug, uso_cupom_por_dia = _cruza_cupom_por_slug(slugs_vistos, "automa")
+
+    rows = []
+    for d, slug, nome_exibicao, sessions, transactions, revenue in rows_raw:
+        if slug in cupom_por_slug:
+            pedidos_cupom, receita_cupom = 0, 0.0
+            for code in cupom_por_slug[slug]:
+                p, r = uso_cupom_por_dia.get(code, {}).get(d, [0, 0.0])
+                pedidos_cupom += p
+                receita_cupom += r
+        else:
+            pedidos_cupom, receita_cupom = "", ""
+        rows.append([d, slug, nome_exibicao, sessions, transactions, revenue, pedidos_cupom, receita_cupom])
+
+    csv_path = os.path.join(BASE_DIR, "historico_crm_automacoes.csv")
+    tmp_path = csv_path + f".tmp{os.getpid()}"
+    with open(tmp_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["data", "automacao", "nome_exibicao", "sessoes", "pedidos", "receita",
+                          "cupom_pedidos", "cupom_receita"])
+        writer.writerows(rows)
+    os.replace(tmp_path, csv_path)
+
+    print(f"[crm-automacoes] {len(rows)} linhas salvas (ultimos {days} dias) | "
+          f"{len(cupom_por_slug)} automacao(oes) com cupom identificado: {list(cupom_por_slug.keys())}")
+    return rows
+
+
+def _fetch_all_discounts():
+    all_discounts = []
+    page = 1
+    while True:
+        d = fetch_with_retry(f"https://api.vnda.com.br/api/v2/discounts?per_page=100&page={page}")
+        if not d:
+            break
+        all_discounts.extend(d)
+        if len(d) < 100:
+            break
+        page += 1
+    return all_discounts
+
+
+def fetch_crm_transmissoes_data(days=400):
+    """Transmissoes (disparos unicos) tem utm_campaign no padrao
+    'transmissao_<nome>' (ex: 'transmissao_adiosfeirinha'), dentro de uma
+    sessao utm_source=bevean + utm_medium=email; normalizamos pro nome de
+    exibicao "Transmissão - <slug>".
+
+    Pra cada slug encontrado, procura na VNDA uma promocao cujo nome contenha
+    tanto "transmiss" quanto o slug (ex: "[CRM][Bevean][Transmissão] Cupom
+    ADIOSFEIRINHA") e cruza o uso diario do(s) cupom(ns) dessa promocao."""
+    ga4_rows = _fetch_ga4_bevean_email_por_campanha(days)
+
+    def limpa_nome(nome_bruto):
+        """So reconhece o padrao exato "transmissao" + tracos/underscores +
+        slug. Campanhas fora desse padrao sao descartadas - nao aparecem na
+        tabela nem no grafico."""
+        m = re.match(r"^transmiss[aã]o[-_]+(.+)$", nome_bruto.strip(), re.IGNORECASE)
+        if m:
+            slug = m.group(1).strip()
+            return slug, f"Transmissão - {slug}"
+        return None, None
+
+    rows_raw = []
+    slugs_vistos = set()
+    for d, campanha_bruta, sessions, transactions, revenue in ga4_rows:
+        slug, nome_exibicao = limpa_nome(campanha_bruta)
+        if not slug:
+            continue  # nao bate no padrao "transmissao_<nome>" - fora da tabela
+        slugs_vistos.add(slug)
+        rows_raw.append([d, nome_exibicao, slug, sessions, transactions, revenue])
+    rows_raw.sort(key=lambda r: r[0])
+
+    cupom_por_slug, uso_cupom_por_dia = _cruza_cupom_por_slug(slugs_vistos, "transmiss")
 
     rows = []
     for d, nome_exibicao, slug, sessions, transactions, revenue in rows_raw:
@@ -1001,9 +1011,7 @@ def fetch_crm_transmissoes_data(days=400):
 # correspondente na Bevean que dispara aquela automacao.
 AUTOMACOES_CONFIG = {
     "boas-vindas-newsletter": {
-        "nome_exibicao": "Boas-vindas (Popup Newsletter)",
         "bevean_segment_id": "982870a1-37b2-4461-ab94-0960de6a718c",
-        "cupom": "BOASVINDAS",
     },
 }
 
@@ -2328,11 +2336,18 @@ def build_dashboard_data():
 
     crm_automacoes_path = os.path.join(BASE_DIR, "historico_crm_automacoes.csv")
     ga4_por_campanha_data = {}  # (utm_campaign, data) -> (sessoes, pedidos, receita)
+    nome_exibicao_por_slug = {}
+    cupom_por_campanha_data = {}  # (slug, data) -> (cupom_pedidos, cupom_receita)
     if os.path.isfile(crm_automacoes_path):
         with open(crm_automacoes_path, encoding="utf-8") as f:
             for r in csv.DictReader(f):
-                ga4_por_campanha_data[(r["automacao"], r["data"])] = (
+                slug = r["automacao"]
+                ga4_por_campanha_data[(slug, r["data"])] = (
                     int(r["sessoes"]), int(r["pedidos"]), float(r["receita"]))
+                nome_exibicao_por_slug[slug] = r.get("nome_exibicao") or slug
+                if r.get("cupom_pedidos"):
+                    cupom_por_campanha_data[(slug, r["data"])] = (
+                        int(r["cupom_pedidos"]), float(r["cupom_receita"]))
 
     bevean_seg_path = os.path.join(BASE_DIR, "historico_bevean_segmentos.csv")
     contagem_por_campanha = defaultdict(dict)  # utm_campaign -> {data: customer_count}
@@ -2353,34 +2368,16 @@ def build_dashboard_data():
                 contatos_por_campanha_data[(utm_campaign, d)] = por_data[d] - por_data[anterior]
             anterior = d
 
-    # uso de cupom por dia (pra cruzar com a automacao correspondente, quando
-    # configurada em AUTOMACOES_CONFIG - so pros dias que a automacao ja
-    # aparece no relatorio, pra nao trazer historico antigo do cupom de antes
-    # da automacao existir)
-    orders_master_para_cupom = load_json("orders_master.json", [])
-    cupom_por_dia = defaultdict(lambda: defaultdict(lambda: [0, 0.0]))  # cupom -> data -> [pedidos, receita]
-    for o in orders_master_para_cupom:
-        code = o.get("coupon_code")
-        if code and o.get("date"):
-            entry = cupom_por_dia[code][o["date"]]
-            entry[0] += 1
-            entry[1] += round(o.get("total") or 0.0, 2)
-
     todas_campanhas = set(c for c, _ in ga4_por_campanha_data) | set(contagem_por_campanha.keys())
     crm_automacoes_rows = []
     for utm_campaign in todas_campanhas:
-        cfg = AUTOMACOES_CONFIG.get(utm_campaign, {})
-        nome_exibicao = cfg.get("nome_exibicao", utm_campaign)
-        cupom_cfg = cfg.get("cupom")
+        nome_exibicao = nome_exibicao_por_slug.get(utm_campaign) or _slug_para_nome_automacao(utm_campaign)
         datas = set(d for (c, d) in ga4_por_campanha_data if c == utm_campaign)
         datas |= set(contagem_por_campanha.get(utm_campaign, {}).keys())
         for d in sorted(datas):
             sessoes, pedidos, receita = ga4_por_campanha_data.get((utm_campaign, d), (0, 0, 0.0))
             contatos = contatos_por_campanha_data.get((utm_campaign, d))
-            if cupom_cfg:
-                cupom_pedidos, cupom_receita = cupom_por_dia.get(cupom_cfg, {}).get(d, [0, 0.0])
-            else:
-                cupom_pedidos, cupom_receita = None, None
+            cupom_pedidos, cupom_receita = cupom_por_campanha_data.get((utm_campaign, d), (None, None))
             crm_automacoes_rows.append([d, nome_exibicao, sessoes, pedidos, receita, contatos, cupom_pedidos, cupom_receita])
 
     for r in stock_sku:
