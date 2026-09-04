@@ -1,6 +1,6 @@
 import traceback
 from datetime import datetime
-from dashboard_lib import r2_pull_all, r2_push_all, fetch_avise_me, fetch_reposicoes_prazo, sync_handling_days, build_dashboard_data, build_final_html, deploy_github_pages, log_line
+from dashboard_lib import r2_pull_all, r2_push_all, fetch_avise_me, fetch_reposicoes_prazo, fetch_calendario_crm, sync_handling_days, build_dashboard_data, build_final_html, deploy_github_pages, log_line
 
 if __name__ == "__main__":
     print(f"=== Sincronizacao de planilhas iniciada: {datetime.now().isoformat(timespec='minutes')} ===")
@@ -9,6 +9,7 @@ if __name__ == "__main__":
         r2_pull_all()
         fetch_avise_me()
         fetch_reposicoes_prazo()
+        fetch_calendario_crm()
         sync_handling_days()
         build_dashboard_data()
         build_final_html()

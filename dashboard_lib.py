@@ -59,6 +59,7 @@ def log_line(script_name, message):
 STATE_FILES = [
     "avise_me.json",
     "banco_enderecos_pedidos.json",
+    "calendario_crm.json",
     "controle_prazo.json",
     "cupons_promocoes.json",
     "dias_manuseio_gerenciados.json",
@@ -1159,6 +1160,52 @@ def fetch_reposicoes_prazo():
     save_json("controle_prazo.json", controle_prazo)
     print(f"[reposicoes-prazo] {len(reposicoes)} reposicoes em aberto | {len(controle_prazo)} SKUs em pre-venda ativa")
     return reposicoes, controle_prazo
+
+
+CALENDARIO_CRM_SHEET_GID = 1259431089
+
+
+def fetch_calendario_crm():
+    """Le a aba 'Calendario CRM' (mesma planilha de Reposicoes/Controle de Prazo)
+    com a regua de disparos de e-mail - uma linha por disparo, alimentada
+    manualmente pelo time de CRM. Colunas esperadas: data, dia_semana, turno,
+    trilha, titulo, publico, conteudo, oferta, cupom."""
+    rows = _sheets_api_get(REPOSICOES_PRAZO_SPREADSHEET_ID, CALENDARIO_CRM_SHEET_GID)
+    if not rows:
+        save_json("calendario_crm.json", [])
+        print("[calendario-crm] planilha vazia")
+        return []
+
+    header = [h.strip() for h in rows[0]]
+    idx = {name: i for i, name in enumerate(header)}
+
+    def cell(r, name):
+        i = idx.get(name)
+        if i is None or i >= len(r):
+            return ""
+        return (r[i] or "").strip()
+
+    out = []
+    for r in rows[1:]:
+        data_str = cell(r, "data")
+        if not data_str:
+            continue
+        out.append({
+            "data": data_str,
+            "dia_semana": cell(r, "dia_semana"),
+            "turno": cell(r, "turno"),
+            "trilha": cell(r, "trilha"),
+            "titulo": cell(r, "titulo"),
+            "publico": cell(r, "publico"),
+            "conteudo": cell(r, "conteudo"),
+            "oferta": cell(r, "oferta"),
+            "cupom": cell(r, "cupom"),
+        })
+
+    out.sort(key=lambda d: d["data"])
+    save_json("calendario_crm.json", out)
+    print(f"[calendario-crm] {len(out)} disparos carregados")
+    return out
 
 
 def sync_handling_days():
@@ -2472,6 +2519,7 @@ def build_dashboard_data():
         "cupons_promocoes": load_json("cupons_promocoes.json", {}),
         "reposicoes": reposicoes,
         "controle_prazo": controle_prazo,
+        "calendario_crm": load_json("calendario_crm.json", []),
         "estoque_deposito": estoque_deposito,
         "expedicao": expedicao,
     }
