@@ -783,7 +783,7 @@ def fetch_crm_channel_data(days=400):
 
 
 # ---------------- PARTE 2H: AUTOMACOES E TRANSMISSOES DE E-MAIL (GA4, via utm_content) ----------------
-def _slug_para_nome_automacao(slug):
+def _slug_para_nome(slug):
     """Ex: 'boas-vindas-newsletter' -> 'Boas Vindas Newsletter'."""
     return " ".join(p.capitalize() for p in re.split(r"[-_]+", slug) if p)
 
@@ -888,7 +888,7 @@ def fetch_crm_automacoes_data(days=400):
         if not m:
             return None, None
         slug = m.group(1).strip()
-        return slug, _slug_para_nome_automacao(slug)
+        return slug, _slug_para_nome(slug)
 
     rows_raw = []
     slugs_vistos = set()
@@ -944,9 +944,10 @@ def _fetch_all_discounts():
 
 def fetch_crm_transmissoes_data(days=400):
     """Transmissoes (disparos unicos) tem utm_campaign no padrao
-    'transmissao_<nome>' (ex: 'transmissao_adiosfeirinha'), dentro de uma
-    sessao utm_source=bevean + utm_medium=email; normalizamos pro nome de
-    exibicao "Transmissão - <slug>".
+    'transmissao_<nome>' (ex: 'transmissao_verao-27'), dentro de uma sessao
+    utm_source=bevean + utm_medium=email. Nome de exibicao derivado do slug
+    com a mesma regra de automacoes (ex: 'verao-27' -> 'Verao 27') - mesmo
+    tratamento de nome pros dois tipos, so muda o prefixo reconhecido.
 
     Pra cada slug encontrado, procura na VNDA uma promocao cujo nome contenha
     tanto "transmiss" quanto o slug (ex: "[CRM][Bevean][Transmissão] Cupom
@@ -960,7 +961,7 @@ def fetch_crm_transmissoes_data(days=400):
         m = re.match(r"^transmiss[aã]o[-_]+(.+)$", nome_bruto.strip(), re.IGNORECASE)
         if m:
             slug = m.group(1).strip()
-            return slug, f"Transmissão - {slug}"
+            return slug, _slug_para_nome(slug)
         return None, None
 
     rows_raw = []
@@ -2371,7 +2372,7 @@ def build_dashboard_data():
     todas_campanhas = set(c for c, _ in ga4_por_campanha_data) | set(contagem_por_campanha.keys())
     crm_automacoes_rows = []
     for utm_campaign in todas_campanhas:
-        nome_exibicao = nome_exibicao_por_slug.get(utm_campaign) or _slug_para_nome_automacao(utm_campaign)
+        nome_exibicao = nome_exibicao_por_slug.get(utm_campaign) or _slug_para_nome(utm_campaign)
         datas = set(d for (c, d) in ga4_por_campanha_data if c == utm_campaign)
         datas |= set(contagem_por_campanha.get(utm_campaign, {}).keys())
         for d in sorted(datas):
