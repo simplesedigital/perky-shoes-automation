@@ -252,6 +252,8 @@ def _process_order(o, ref_agg, sku_sales):
     master_row = {
         "code": code, "date": order_date, "hour": hour, "status": status, "total": total,
         "coupon_code": o.get("coupon_code"), "discount_price": o.get("discount_price") or 0.0,
+        "card": o.get("card"), "slip": o.get("slip"), "deposit": o.get("deposit"),
+        "payment_method": o.get("payment_method"), "installments": o.get("installments"),
     }
     return master_row, item_list
 
@@ -392,6 +394,48 @@ def backfill_pedidos_itens(start="2023-07-01"):
     save_json("pedidos_itens.json", pedidos_itens)
     com_email = sum(1 for v in pedidos_itens.values() if v["email"])
     print(f"[backfill] concluido: {len(pedidos_itens)} pedidos salvos em pedidos_itens.json ({com_email} com email)")
+
+
+def backfill_payment_data(start="2023-07-01"):
+    """Preenche card/slip/deposit/payment_method/installments em orders_master.json
+    pro historico inteiro (pedidos ja sincronizados antes desses campos existirem).
+    Rodar uma unica vez; dali em diante sync_orders() ja captura isso em pedidos novos."""
+    finish = date.today().isoformat()
+    all_orders = []
+    page = 1
+    while True:
+        url = f"https://api.vnda.com.br/api/v2/orders?per_page=100&page={page}&start={start}&finish={finish}"
+        data = fetch_with_retry(url)
+        if not data:
+            break
+        all_orders.extend(data)
+        if page % 20 == 0:
+            print(f"[backfill-pagamento] pagina {page}, {len(all_orders)} pedidos ate agora")
+        page += 1
+        if len(data) < 100:
+            break
+    print(f"[backfill-pagamento] {len(all_orders)} pedidos buscados da VNDA")
+
+    payment_por_code = {}
+    for o in all_orders:
+        code = o.get("code")
+        if not code:
+            continue
+        payment_por_code[code] = {
+            "card": o.get("card"), "slip": o.get("slip"), "deposit": o.get("deposit"),
+            "payment_method": o.get("payment_method"), "installments": o.get("installments"),
+        }
+
+    orders_master = load_json("orders_master.json", [])
+    atualizados = 0
+    for row in orders_master:
+        dados = payment_por_code.get(row["code"])
+        if dados:
+            row.update(dados)
+            atualizados += 1
+
+    save_json("orders_master.json", orders_master)
+    print(f"[backfill-pagamento] {atualizados}/{len(orders_master)} pedidos atualizados com dados de pagamento")
 
 
 def rebuild_vendas_sku_com_status():
@@ -2535,7 +2579,8 @@ def build_dashboard_data():
 
     orders_master = load_json("orders_master.json", [])
     orders_raw = [[o["code"], o["date"], o["status"], round(o["total"] or 0.0, 2), o.get("hour"),
-                   o.get("coupon_code"), round(o.get("discount_price") or 0.0, 2)]
+                   o.get("coupon_code"), round(o.get("discount_price") or 0.0, 2),
+                   o.get("payment_method"), o.get("installments"), o.get("card"), o.get("slip"), o.get("deposit")]
                   for o in orders_master if o["date"]]
 
     addr_db = load_json("banco_enderecos_pedidos.json", {})

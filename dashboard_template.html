@@ -395,6 +395,7 @@ tbody tr:last-child td{border-bottom:none;}
     <button class="tabbtn" id="padbtn-periodo" role="tab" aria-selected="true" onclick="switchPadroesSub('periodo')">Período</button>
     <button class="tabbtn" id="padbtn-regiao" role="tab" aria-selected="false" onclick="switchPadroesSub('regiao')">Região</button>
     <button class="tabbtn" id="padbtn-tamanho" role="tab" aria-selected="false" onclick="switchPadroesSub('tamanho')">Tamanho</button>
+    <button class="tabbtn" id="padbtn-pagamento" role="tab" aria-selected="false" onclick="switchPadroesSub('pagamento')">Pagamento</button>
   </div>
 
   <div class="card">
@@ -475,6 +476,18 @@ tbody tr:last-child td{border-bottom:none;}
     <p class="footnote" id="tamanho-summary"></p>
     <div class="chartwrap" id="chartwrap-tamanho" style="height:280px;"><canvas id="chart-tamanho" role="img" aria-label="Receita e quantidade vendida por tamanho"></canvas></div>
     <div class="tablewrap maxh"><table id="table-tamanho"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="padpanel-pagamento">
+    <div class="section-title">Forma de pagamento</div>
+    <p class="footnote" style="margin-top:-6px;">Quantidade, valor total e participação de cada forma de pagamento, no período selecionado acima.</p>
+    <div class="chartwrap" id="chartwrap-pagamento-tipo" style="height:220px;"><canvas id="chart-pagamento-tipo" role="img" aria-label="Receita por forma de pagamento"></canvas></div>
+    <div class="tablewrap"><table id="table-pagamento-tipo"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Parcelamento no cartão</div>
+    <p class="footnote" style="margin-top:-6px;">Só pedidos pagos com cartão, quebrados por número de parcelas.</p>
+    <div class="chartwrap" id="chartwrap-pagamento-parcelas" style="height:220px;"><canvas id="chart-pagamento-parcelas" role="img" aria-label="Receita por número de parcelas"></canvas></div>
+    <div class="tablewrap"><table id="table-pagamento-parcelas"><thead></thead><tbody></tbody></table></div>
   </div>
 
 </div>
@@ -1170,7 +1183,7 @@ function switchTab(name){
 }
 
 function switchPadroesSub(name){
-  ['periodo','regiao','tamanho'].forEach(n=>{
+  ['periodo','regiao','tamanho','pagamento'].forEach(n=>{
     document.getElementById('padpanel-'+n).classList.toggle('active', n===name);
     document.getElementById('padbtn-'+n).setAttribute('aria-selected', n===name);
   });
@@ -2334,6 +2347,57 @@ function renderTamanho(start, end, status){
   document.getElementById('tamanho-summary').textContent = `${fmtInt.format(totalQty)} pares vendidos no período`;
 }
 
+const PAGAMENTO_COLUMNS = (dimLabel) => [
+  {key:'name', label:dimLabel, type:'text', format:r=>r.name, sortValue:r=>r.name},
+  {key:'count', label:'Quantidade', type:'number', format:r=>fmtInt.format(r.count), sortValue:r=>r.count},
+  {key:'revenue', label:'Valor total', type:'number', format:r=>fmtBRL.format(r.revenue), sortValue:r=>r.revenue},
+  {key:'pct', label:'% dos pedidos', type:'number', format:r=>fmtPctPlain(r.pct), sortValue:r=>r.pct},
+];
+const PARCELA_ORDER = ['À vista','2x','3x','4x','5x','6x','7x','8x','9x','10x','Outro'];
+
+// o[7]=payment_method, o[8]=installments, o[9]=card, o[10]=slip, o[11]=deposit
+function renderPagamento(orders){
+  const byTipo = new Map();
+  const byParcela = new Map();
+  let cardTotal = 0;
+
+  for(const o of orders){
+    const card = o[9], slip = o[10], method = o[7];
+    let tipo;
+    if(card === true) tipo = 'Cartão';
+    else if(method === 'Pix') tipo = 'Pix';
+    else if(slip === true) tipo = 'Boleto';
+    else tipo = 'Outro';
+
+    if(!byTipo.has(tipo)) byTipo.set(tipo, {revenue:0, count:0});
+    const t = byTipo.get(tipo);
+    t.revenue += o[3]; t.count += 1;
+
+    if(card === true){
+      cardTotal += 1;
+      const parcelas = o[8];
+      const label = parcelas===1 ? 'À vista' : (parcelas>=2 && parcelas<=10 ? parcelas+'x' : 'Outro');
+      if(!byParcela.has(label)) byParcela.set(label, {revenue:0, count:0});
+      const p = byParcela.get(label);
+      p.revenue += o[3]; p.count += 1;
+    }
+  }
+
+  const totalOrders = orders.length;
+  const tipoRows = Array.from(byTipo.entries()).map(([name,v])=>({
+    name, revenue:v.revenue, count:v.count, pct: totalOrders>0 ? v.count/totalOrders*100 : 0,
+  })).sort((a,b)=>b.count-a.count);
+  renderBarChart('chart-pagamento-tipo', tipoRows.map(r=>r.name), tipoRows.map(r=>r.revenue), 'Valor total');
+  renderSortableTable('table-pagamento-tipo', PAGAMENTO_COLUMNS('Forma de pagamento'), tipoRows);
+
+  const parcelaRows = PARCELA_ORDER.filter(label=>byParcela.has(label)).map(label=>{
+    const v = byParcela.get(label);
+    return {name:label, revenue:v.revenue, count:v.count, pct: cardTotal>0 ? v.count/cardTotal*100 : 0};
+  });
+  renderBarChart('chart-pagamento-parcelas', parcelaRows.map(r=>r.name), parcelaRows.map(r=>r.revenue), 'Valor total');
+  renderSortableTable('table-pagamento-parcelas', PAGAMENTO_COLUMNS('Parcelas'), parcelaRows);
+}
+
 const cupomPromoMap = DATA.cupons_promocoes || {};
 function promoNameForCoupon(coupon){
   const info = cupomPromoMap[coupon];
@@ -2415,6 +2479,7 @@ function renderPadroes(){
     renderMonth(orders, start, end);
     renderGeo(orders);
     renderTamanho(start, end, status);
+    renderPagamento(orders);
   }catch(err){
     console.error('Falha ao renderizar Padrões:', err);
   }
