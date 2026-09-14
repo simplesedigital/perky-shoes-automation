@@ -622,14 +622,20 @@ def _urlopen_json_retry(req, max_retries=5, timeout=20):
     raise RuntimeError(f"max retries exceeded: {req.full_url}")
 
 
-def _sheets_api_get(spreadsheet_id, sheet_gid, want_grid_range=False):
+def _google_sheets_creds(write=False):
     from google.oauth2 import service_account
     import google.auth.transport.requests
 
+    scope = "spreadsheets" if write else "spreadsheets.readonly"
     creds = service_account.Credentials.from_service_account_file(
-        GOOGLE_SERVICE_ACCOUNT_FILE, scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
+        GOOGLE_SERVICE_ACCOUNT_FILE, scopes=[f"https://www.googleapis.com/auth/{scope}"]
     )
     creds.refresh(google.auth.transport.requests.Request())
+    return creds
+
+
+def _sheets_api_get(spreadsheet_id, sheet_gid, want_grid_range=False):
+    creds = _google_sheets_creds()
     auth_headers = {"Authorization": f"Bearer {creds.token}"}
 
     # resolve o titulo atual da aba pelo sheetId, pra sobreviver a renomeacoes
@@ -1018,18 +1024,32 @@ AUTOMACOES_CONFIG = {
 }
 
 
-def _bevean_api_get(path):
+def _bevean_headers():
     key = _secret("BEVEAN_API_KEY", "bevean_api_key")
-    req = urllib.request.Request(
-        f"https://api.bevean.com{path}",
-        headers={
-            "Authorization": f"Bearer {key}",
-            # a Cloudflare da Bevean bloqueia o user-agent padrao do Python (WAF)
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json",
-        },
-    )
+    return {
+        "Authorization": f"Bearer {key}",
+        # a Cloudflare da Bevean bloqueia o user-agent padrao do Python (WAF)
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+    }
+
+
+def _bevean_api_get(path):
+    req = urllib.request.Request(f"https://api.bevean.com{path}", headers=_bevean_headers())
     return _urlopen_json_retry(req)
+
+
+def _bevean_api_post(path, payload):
+    """POST na API da Bevean. Levanta urllib.error.HTTPError em erro - quem chama
+    decide o que fazer com cada codigo (ex: 422 = contato ja existe, nao e falha)."""
+    headers = {**_bevean_headers(), "Content-Type": "application/json"}
+    req = urllib.request.Request(
+        f"https://api.bevean.com{path}", data=json.dumps(payload).encode("utf-8"),
+        method="POST", headers=headers,
+    )
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        raw = resp.read()
+        return json.loads(raw) if raw else {}
 
 
 def fetch_bevean_segment_snapshots():
@@ -1052,6 +1072,82 @@ def fetch_bevean_segment_snapshots():
 
     print(f"[bevean-segmentos] {len(linhas_hoje)} snapshot(s) salvos para {today}")
     return linhas_hoje
+
+
+# ---------------- PARTE 2J: NOVOS LEADS DA NEWSLETTER -> BEVEAN ----------------
+# A planilha "Newsletter" e alimentada por um Apps Script (apps_script_newsletter.gs)
+# que le os e-mails de notificacao de inscricao no popup do site e grava uma linha
+# por lead (data_email, email_cliente). Aqui so cruzamos: pega quem ainda nao tem
+# nada na coluna "sincronizado_bevean" e cria o contato via API da Bevean.
+NEWSLETTER_SHEET_ID = "1K-SoztZyU0yw99Q9G1r7L2FdfqbVgHmGHtJyQNO57PY"
+NEWSLETTER_SHEET_GID = 0  # aba "Plan1"
+
+
+def sync_newsletter_leads_to_bevean():
+    rows = _sheets_api_get(NEWSLETTER_SHEET_ID, NEWSLETTER_SHEET_GID)
+    if not rows:
+        print("[newsletter-bevean] planilha vazia")
+        return
+
+    header = [h.strip() for h in rows[0]]
+    idx = {name: i for i, name in enumerate(header)}
+    col_email = idx.get("email_cliente")
+    col_sync = idx.get("sincronizado_bevean")
+    if col_email is None or col_sync is None:
+        print("[newsletter-bevean] colunas 'email_cliente' ou 'sincronizado_bevean' nao encontradas")
+        return
+
+    pendentes = []
+    for i, r in enumerate(rows[1:], start=2):  # linha 2 = primeira linha de dados
+        email = (r[col_email] if col_email < len(r) else "").strip().lower()
+        ja_sincronizado = (r[col_sync] if col_sync < len(r) else "").strip()
+        if email and not ja_sincronizado:
+            pendentes.append((i, email))
+
+    if not pendentes:
+        print("[newsletter-bevean] nenhum lead novo pra sincronizar")
+        return
+
+    segment_id = AUTOMACOES_CONFIG["boas-vindas-newsletter"]["bevean_segment_id"]
+    criados, duplicados, erros = 0, 0, 0
+    updates = []
+    for linha, email in pendentes:
+        try:
+            customer = _bevean_api_post("/v1/customers", {"email": email, "status": "active"})
+            criados += 1
+            resultado = "sim"
+            try:
+                _bevean_api_post(f"/v1/segments/{segment_id}/customers", {"customer_id": customer["id"]})
+            except urllib.error.HTTPError as e:
+                resultado = f"criado, mas erro no segmento (HTTP {e.code})"
+                print(f"[newsletter-bevean] {email} criado, mas erro ao adicionar no segmento: "
+                      f"HTTP {e.code} {e.read().decode()[:200]}")
+        except urllib.error.HTTPError as e:
+            if e.code == 422:
+                duplicados += 1
+                resultado = "ja existia"
+            else:
+                erros += 1
+                print(f"[newsletter-bevean] erro ao criar {email}: HTTP {e.code} {e.read().decode()[:200]}")
+                continue  # deixa sem marcar, tenta de novo na proxima execucao
+        updates.append((linha, resultado))
+
+    if updates:
+        col_letter = chr(ord("A") + col_sync)
+        creds = _google_sheets_creds(write=True)
+        for linha, resultado in updates:
+            rng = urllib.parse.quote(f"'Plan1'!{col_letter}{linha}", safe="")
+            body = json.dumps({"values": [[resultado]]}).encode("utf-8")
+            req = urllib.request.Request(
+                f"https://sheets.googleapis.com/v4/spreadsheets/{NEWSLETTER_SHEET_ID}/values/{rng}"
+                f"?valueInputOption=RAW",
+                data=body, method="PUT",
+                headers={"Authorization": f"Bearer {creds.token}", "Content-Type": "application/json"},
+            )
+            _urlopen_json_retry(req)
+
+    print(f"[newsletter-bevean] {criados} criados, {duplicados} ja existiam, {erros} com erro "
+          f"(de {len(pendentes)} pendentes)")
 
 
 # ---------------- PARTE 2F: MAPA CUPOM -> PROMOCAO (VNDA discounts) ----------------
