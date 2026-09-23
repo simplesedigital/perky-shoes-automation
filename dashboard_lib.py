@@ -771,11 +771,14 @@ def fetch_product_pageviews(days=90):
 
 
 # ---------------- PARTE 2G: CANAL CRM (GA4) ----------------
-# Canal CRM = sessoes cujo sessionSourceMedium contem "mail" (cobre
-# email, mailchimp, newsletter, etc) E NAO contem "referral". Sessoes,
+# Canal CRM = sessoes cuja origem/midia da sessao (sessionSourceMedium) bate
+# no regex parcial "mail|whats" (cobre email, mailchimp, newsletter, whatsapp
+# etc). Mesma regra configurada no publico do GA4 (Dimensao: Origem/midia da
+# sessao, Tipo de correspondencia: RegEx parcial, Valor: mail|whats). Sessoes,
 # pedidos e receita atribuidos pelo proprio GA4, por dia e por origem/midia,
 # pra o frontend agregar em qualquer periodo selecionado (mesmo padrao do
 # historico_pageviews.csv) e montar a tabela de detalhe por origem/midia.
+CRM_CHANNEL_REGEX = "mail|whats"
 
 def fetch_crm_channel_data(days=400):
     from google.oauth2 import service_account
@@ -791,16 +794,10 @@ def fetch_crm_channel_data(days=400):
         "dateRanges": [{"startDate": f"{days}daysAgo", "endDate": "today"}],
         "dimensions": [{"name": "date"}, {"name": "sessionSourceMedium"}],
         "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}],
-        "dimensionFilter": {"andGroup": {"expressions": [
-            {"filter": {
-                "fieldName": "sessionSourceMedium",
-                "stringFilter": {"matchType": "CONTAINS", "value": "mail", "caseSensitive": False},
-            }},
-            {"notExpression": {"filter": {
-                "fieldName": "sessionSourceMedium",
-                "stringFilter": {"matchType": "CONTAINS", "value": "referral", "caseSensitive": False},
-            }}},
-        ]}},
+        "dimensionFilter": {"filter": {
+            "fieldName": "sessionSourceMedium",
+            "stringFilter": {"matchType": "PARTIAL_REGEXP", "value": CRM_CHANNEL_REGEX, "caseSensitive": False},
+        }},
         "limit": 100000,
     }).encode()
     req = urllib.request.Request(
@@ -829,7 +826,7 @@ def fetch_crm_channel_data(days=400):
     os.replace(tmp_path, csv_path)
 
     print(f"[crm-canal] {len(rows)} linhas salvas (ultimos {days} dias) | "
-          f"canal = origem/midia contem 'mail' e nao contem 'referral'")
+          f"canal = origem/midia bate no regex parcial '{CRM_CHANNEL_REGEX}'")
     return rows
 
 
