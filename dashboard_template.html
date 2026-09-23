@@ -1625,7 +1625,7 @@ function syncDynamicSticky(){
   const topPanel = document.querySelector('#toppanel-padroes.active, #toppanel-produto.active, #toppanel-deposito.active, #toppanel-vendas.active, #toppanel-crm.active');
   const sub = topPanel ? topPanel.querySelector(':scope > .tabbar.sub') : null;
   const leafPanel = topPanel ? (topPanel.querySelector(':scope > .panel.active') || topPanel) : null;
-  const card = leafPanel ? leafPanel.querySelector(':scope > .card') : null;
+  const card = leafPanel ? (leafPanel.querySelector(':scope > .card') || leafPanel.querySelector(':scope > .subpanel.active > .card')) : null;
   if(sub){
     movedSubPh = document.createComment('sticky-sub-placeholder');
     sub.parentNode.insertBefore(movedSubPh, sub);
