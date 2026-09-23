@@ -1172,6 +1172,7 @@ function switchTopTab(name){
   });
   if(name==='deposito'){ safeRun(renderDepositoSaudeCharts, 'gráfico do Depósito'); safeRun(renderExpedicao, 'painel de Expedição'); }
   syncDynamicSticky();
+  updateRoute();
 }
 
 function switchTab(name){
@@ -1180,6 +1181,7 @@ function switchTab(name){
     document.getElementById('tabbtn-'+n).setAttribute('aria-selected', n===name);
   });
   syncDynamicSticky();
+  updateRoute();
 }
 
 function switchPadroesSub(name){
@@ -1190,6 +1192,7 @@ function switchPadroesSub(name){
   document.getElementById('field-tamanho-search').style.display = name==='tamanho' ? '' : 'none';
   document.getElementById('field-tamanho-categoria').style.display = name==='tamanho' ? '' : 'none';
   syncDynamicSticky();
+  updateRoute();
 }
 
 function switchDepositoSub(name){
@@ -1198,6 +1201,7 @@ function switchDepositoSub(name){
     document.getElementById('depbtn-'+n).setAttribute('aria-selected', n===name);
   });
   syncDynamicSticky();
+  updateRoute();
 }
 
 function switchVendasSub(name){
@@ -1206,6 +1210,7 @@ function switchVendasSub(name){
     document.getElementById('vdbtn-'+n).setAttribute('aria-selected', n===name);
   });
   syncDynamicSticky();
+  updateRoute();
 }
 
 function switchCrmSub(name){
@@ -1214,7 +1219,61 @@ function switchCrmSub(name){
     document.getElementById('crmbtn-'+n).setAttribute('aria-selected', n===name);
   });
   syncDynamicSticky();
+  updateRoute();
 }
+
+/* ---------------- ROTAS (URL dinamica por aba) ---------------- */
+// No GitHub Pages usa caminho (/crm/canal, com 404.html redirecionando o refresh);
+// fora dele (local, file://) usa hash (#/crm/canal).
+const ROUTES = {
+  vendas:   {slug:'vendas',   btn:'vdbtn-',  sw:switchVendasSub,    subs:{cupons:'cupons'}},
+  crm:      {slug:'crm',      btn:'crmbtn-', sw:switchCrmSub,       subs:{email:'canal', automacoes:'automacoes', transmissoes:'transmissoes', calendario:'calendario'}},
+  produto:  {slug:'produto',  btn:'tabbtn-', sw:switchTab,          subs:{abc:'curva-abc', estoque:'estoque', desconto:'descontos', crosssell:'venda-cruzada', 'avise-me':'demanda-reprimida', reposicoes:'reposicoes', compras:'compras'}},
+  deposito: {slug:'logistica',btn:'depbtn-', sw:switchDepositoSub,  subs:{prateleiras:'deposito', expedicao:'expedicao'}},
+  padroes:  {slug:'padroes',  btn:'padbtn-', sw:switchPadroesSub,   subs:{periodo:'periodo', regiao:'regiao', tamanho:'tamanho', pagamento:'pagamento'}},
+};
+const ROUTE_BASE = /\.github\.io$/.test(location.hostname) ? '/' + (location.pathname.split('/')[1] || '') + '/' : null;
+let routeLock = false;
+
+function currentRoutePath(){
+  const top = Object.keys(ROUTES).find(k => document.getElementById('toppanel-'+k).classList.contains('active'));
+  if(!top) return null;
+  const r = ROUTES[top];
+  const sub = Object.keys(r.subs).find(k => document.getElementById(r.btn+k).getAttribute('aria-selected')==='true');
+  return r.slug + (sub ? '/' + r.subs[sub] : '');
+}
+function locationRoutePath(){
+  if(ROUTE_BASE){
+    const q = new URLSearchParams(location.search).get('r');
+    return (q !== null ? q : location.pathname.slice(ROUTE_BASE.length)).replace(/^\/+|\/+$/g, '');
+  }
+  return location.hash.replace(/^#\/?/, '').replace(/\/+$/, '');
+}
+function routeUrl(path){ return ROUTE_BASE ? ROUTE_BASE + path : location.pathname + location.search + '#/' + path; }
+
+function updateRoute(replace){
+  if(routeLock) return;
+  const path = currentRoutePath();
+  if(!path) return;
+  const url = routeUrl(path);
+  if(url === location.pathname + location.search + location.hash) return;
+  try{ history[replace ? 'replaceState' : 'pushState'](null, '', url); }catch(e){}
+}
+function applyRoute(){
+  const parts = locationRoutePath().split('/').filter(Boolean);
+  const top = Object.keys(ROUTES).find(k => ROUTES[k].slug === parts[0]);
+  if(!top) return false;
+  routeLock = true;
+  try{
+    switchTopTab(top);
+    const r = ROUTES[top];
+    const sub = Object.keys(r.subs).find(k => r.subs[k] === parts[1]);
+    if(sub) r.sw(sub);
+  } finally { routeLock = false; }
+  updateRoute(true);
+  return true;
+}
+window.addEventListener('popstate', applyRoute);
 
 const fmtBRL = new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0});
 const fmtInt = new Intl.NumberFormat('pt-BR');
@@ -4278,4 +4337,6 @@ document.addEventListener('focusout', e=>{
   const icon = e.target.closest('.infotip');
   if(icon) hideInfotip(icon);
 });
+
+applyRoute();
 </script>

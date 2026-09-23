@@ -2766,21 +2766,17 @@ def deploy_netlify():
 
 # ---------------- PARTE 6: PUBLICAR NO GITHUB PAGES ----------------
 
-def deploy_github_pages():
-    with open(os.path.join(BASE_DIR, "github_config.json"), encoding="utf-8") as f:
-        config = json.load(f)
-    config["token"] = os.environ.get("GITHUB_PAGES_TOKEN", config.get("token"))
+def _spa_404_html(base_path):
+    return (
+        '<!doctype html><meta charset="utf-8"><title>Dashboard E-commerce — Perky Shoes</title>'
+        '<script>var b="' + base_path + '",p=location.pathname;'
+        'if(p.indexOf(b)===0)p=p.slice(b.length);'
+        'location.replace(b+"?r="+encodeURIComponent(p.split("/").filter(Boolean).join("/")));</script>'
+    )
 
-    html_path = os.path.join(BASE_DIR, "curva-abc-perky-shoes.html")
-    with open(html_path, "rb") as f:
-        content_b64 = base64.b64encode(f.read()).decode()
 
-    api_base = f"https://api.github.com/repos/{config['owner']}/{config['repo']}/contents/{config['path']}"
-    gh_headers = {
-        "Authorization": f"Bearer {config['token']}",
-        "Accept": "application/vnd.github+json",
-    }
-
+def _github_put_file(config, gh_headers, path, content_bytes):
+    api_base = f"https://api.github.com/repos/{config['owner']}/{config['repo']}/contents/{path}"
     sha = None
     req = urllib.request.Request(f"{api_base}?ref={config['branch']}", headers=gh_headers)
     try:
@@ -2792,19 +2788,35 @@ def deploy_github_pages():
 
     body = {
         "message": f"Atualizacao automatica do dashboard - {date.today().isoformat()}",
-        "content": content_b64,
+        "content": base64.b64encode(content_bytes).decode(),
         "branch": config["branch"],
     }
     if sha:
         body["sha"] = sha
 
-    data = json.dumps(body).encode()
     req2 = urllib.request.Request(
-        api_base, data=data, method="PUT",
+        api_base, data=json.dumps(body).encode(), method="PUT",
         headers={**gh_headers, "Content-Type": "application/json"},
     )
     with urllib.request.urlopen(req2) as resp2:
         resp2.read()
+
+
+def deploy_github_pages():
+    with open(os.path.join(BASE_DIR, "github_config.json"), encoding="utf-8") as f:
+        config = json.load(f)
+    config["token"] = os.environ.get("GITHUB_PAGES_TOKEN", config.get("token"))
+    gh_headers = {
+        "Authorization": f"Bearer {config['token']}",
+        "Accept": "application/vnd.github+json",
+    }
+
+    with open(os.path.join(BASE_DIR, "curva-abc-perky-shoes.html"), "rb") as f:
+        _github_put_file(config, gh_headers, config["path"], f.read())
+
+    # GitHub Pages devolve 404.html pra rotas como /crm/canal; ele redireciona pro index com ?r=
+    base_path = "/" + config["pages_url"].rstrip("/").split("/")[-1] + "/"
+    _github_put_file(config, gh_headers, "404.html", _spa_404_html(base_path).encode("utf-8"))
 
     print(f"[github pages] publicado com sucesso: {config['pages_url']}")
 
