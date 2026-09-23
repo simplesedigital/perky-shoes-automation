@@ -396,6 +396,7 @@ tbody tr:last-child td{border-bottom:none;}
     <button class="tabbtn" id="padbtn-regiao" role="tab" aria-selected="false" onclick="switchPadroesSub('regiao')">Região</button>
     <button class="tabbtn" id="padbtn-tamanho" role="tab" aria-selected="false" onclick="switchPadroesSub('tamanho')">Tamanho</button>
     <button class="tabbtn" id="padbtn-pagamento" role="tab" aria-selected="false" onclick="switchPadroesSub('pagamento')">Pagamento</button>
+    <button class="tabbtn" id="padbtn-envio" role="tab" aria-selected="false" onclick="switchPadroesSub('envio')">Envio</button>
   </div>
 
   <div class="card">
@@ -488,6 +489,34 @@ tbody tr:last-child td{border-bottom:none;}
     <p class="footnote" style="margin-top:-6px;">Só pedidos pagos com cartão, quebrados por número de parcelas.</p>
     <div class="chartwrap" id="chartwrap-pagamento-parcelas" style="height:220px;"><canvas id="chart-pagamento-parcelas" role="img" aria-label="Receita por número de parcelas"></canvas></div>
     <div class="tablewrap"><table id="table-pagamento-parcelas"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="padpanel-envio">
+    <div class="kpirow" id="envio-kpirow"></div>
+    <p class="footnote" id="envio-coverage-note"></p>
+
+    <div class="section-title">Formas de envio mais usadas</div>
+    <p class="footnote" style="margin-top:-6px;">Quantidade de pedidos e receita por forma de envio escolhida pelo cliente, no período selecionado acima.</p>
+    <div class="chartwrap" id="chartwrap-envio-metodo" style="height:240px;"><canvas id="chart-envio-metodo" role="img" aria-label="Pedidos por forma de envio"></canvas></div>
+    <div class="tablewrap"><table id="table-envio-metodo"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Desconto no frete por forma de envio</div>
+    <p class="footnote" style="margin-top:-6px;">Frete cotado = valor calculado pela transportadora no checkout. Frete pago = o que o cliente realmente pagou. Desconto = cotado − pago (frete grátis e promoções de frete). "Retire Aqui" não tem frete cotado. Pedidos antigos sem cotação registrada ficam de fora dessas colunas.</p>
+    <div class="chartwrap" id="chartwrap-envio-desconto" style="height:240px;"><canvas id="chart-envio-desconto" role="img" aria-label="Desconto no frete por forma de envio"></canvas></div>
+    <div class="tablewrap"><table id="table-envio-desconto"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Preferência por região</div>
+    <p class="footnote" style="margin-top:-6px;">Participação de cada forma de envio nos pedidos de cada estado (10 estados com mais pedidos no gráfico; tabela completa abaixo).</p>
+    <div class="chartwrap" id="chartwrap-envio-regiao" style="height:320px;"><canvas id="chart-envio-regiao" role="img" aria-label="Participação das formas de envio por estado"></canvas></div>
+    <div class="tablewrap maxh"><table id="table-envio-regiao"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Evolução do mix de envio</div>
+    <p class="footnote" style="margin-top:-6px;">Participação mensal de cada forma de envio nos pedidos do período — mostra quando o mix mudou.</p>
+    <div class="chartwrap" id="chartwrap-envio-mes" style="height:300px;"><canvas id="chart-envio-mes" role="img" aria-label="Participação mensal das formas de envio"></canvas></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Prazo de entrega</div>
+    <p class="footnote" style="margin-top:-6px;">Prazo prometido ao cliente no checkout (dias corridos) e tempo real entre o envio e a entrega (só pedidos já entregues).</p>
+    <div class="tablewrap"><table id="table-envio-prazo"><thead></thead><tbody></tbody></table></div>
   </div>
 
 </div>
@@ -1185,7 +1214,7 @@ function switchTab(name){
 }
 
 function switchPadroesSub(name){
-  ['periodo','regiao','tamanho','pagamento'].forEach(n=>{
+  ['periodo','regiao','tamanho','pagamento','envio'].forEach(n=>{
     document.getElementById('padpanel-'+n).classList.toggle('active', n===name);
     document.getElementById('padbtn-'+n).setAttribute('aria-selected', n===name);
   });
@@ -1230,7 +1259,7 @@ const ROUTES = {
   crm:      {slug:'crm',      btn:'crmbtn-', sw:switchCrmSub,       subs:{email:'canal', automacoes:'automacoes', transmissoes:'transmissoes', calendario:'calendario'}},
   produto:  {slug:'produto',  btn:'tabbtn-', sw:switchTab,          subs:{abc:'curva-abc', estoque:'estoque', desconto:'descontos', crosssell:'venda-cruzada', 'avise-me':'demanda-reprimida', reposicoes:'reposicoes', compras:'compras'}},
   deposito: {slug:'logistica',btn:'depbtn-', sw:switchDepositoSub,  subs:{prateleiras:'deposito', expedicao:'expedicao'}},
-  padroes:  {slug:'padroes',  btn:'padbtn-', sw:switchPadroesSub,   subs:{periodo:'periodo', regiao:'regiao', tamanho:'tamanho', pagamento:'pagamento'}},
+  padroes:  {slug:'padroes',  btn:'padbtn-', sw:switchPadroesSub,   subs:{periodo:'periodo', regiao:'regiao', tamanho:'tamanho', pagamento:'pagamento', envio:'envio'}},
 };
 const ROUTE_BASE = /\.github\.io$/.test(location.hostname) ? '/' + (location.pathname.split('/')[1] || '') + '/' : null;
 let routeLock = false;
@@ -2457,6 +2486,165 @@ function renderPagamento(orders){
   renderSortableTable('table-pagamento-parcelas', PAGAMENTO_COLUMNS('Parcelas'), parcelaRows);
 }
 
+const ordersEnvio = DATA.orders_envio || {};
+const envioMetodos = DATA.envio_metodos || [];
+const envioColor = (name) => seriesColor(Math.max(0, envioMetodos.indexOf(name)));
+
+function renderStackedPctChart(canvasId, labels, datasets){
+  if(typeof Chart === 'undefined') return;
+  if(barCharts[canvasId]) barCharts[canvasId].destroy();
+  const cs = getComputedStyle(document.documentElement);
+  const muted = cs.getPropertyValue('--text-muted').trim();
+  const grid = cs.getPropertyValue('--grid').trim();
+  barCharts[canvasId] = new Chart(document.getElementById(canvasId), {
+    type:'bar',
+    data:{labels, datasets: datasets.map(d=>({label:d.label, data:d.data, backgroundColor:d.color, borderWidth:0, maxBarThickness:40}))},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:true, position:'bottom', labels:{color:muted, boxWidth:12}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtPctPlain(c.parsed.y)}}
+      },
+      scales:{
+        x:{stacked:true, grid:{display:false}, ticks:{color:muted, maxRotation:0, autoSkip:true}},
+        y:{stacked:true, max:100, grid:{color:grid}, ticks:{color:muted, callback:v=>v+'%'}}
+      }
+    }
+  });
+}
+
+const ENVIO_METODO_COLUMNS = [
+  {key:'name', label:'Forma de envio', type:'text', format:r=>r.name, sortValue:r=>r.name},
+  {key:'count', label:'Pedidos', type:'number', format:r=>fmtInt.format(r.count), sortValue:r=>r.count},
+  {key:'pct', label:'% dos pedidos', type:'number', format:r=>fmtPctPlain(r.pct), sortValue:r=>r.pct},
+  {key:'revenue', label:'Receita', type:'number', format:r=>fmtBRL.format(r.revenue), sortValue:r=>r.revenue},
+  {key:'ticket', label:'Ticket médio', type:'number', format:r=>fmtBRL.format(r.ticket), sortValue:r=>r.ticket},
+];
+const ENVIO_DESCONTO_COLUMNS = [
+  {key:'name', label:'Forma de envio', type:'text', format:r=>r.name, sortValue:r=>r.name},
+  {key:'qN', label:'Pedidos c/ cotação', type:'number', format:r=>fmtInt.format(r.qN), sortValue:r=>r.qN},
+  {key:'quoted', label:'Frete cotado', type:'number', format:r=>fmtBRL.format(r.quoted), sortValue:r=>r.quoted},
+  {key:'paid', label:'Frete pago', type:'number', format:r=>fmtBRL.format(r.paid), sortValue:r=>r.paid},
+  {key:'diff', label:'Desconto (cotado − pago)', type:'number', format:r=>fmtBRL.format(r.diff), sortValue:r=>r.diff},
+  {key:'diffPct', label:'% do cotado', type:'number', format:r=>fmtPctPlain(r.diffPct), sortValue:r=>r.diffPct},
+  {key:'freeCount', label:'Frete grátis', type:'number', format:r=>fmtInt.format(r.freeCount), sortValue:r=>r.freeCount},
+  {key:'freePct', label:'% frete grátis', type:'number', format:r=>fmtPctPlain(r.freePct), sortValue:r=>r.freePct},
+  {key:'avgQuoted', label:'Cotado médio', type:'number', format:r=>fmtBRL.format(r.avgQuoted), sortValue:r=>r.avgQuoted},
+  {key:'avgPaid', label:'Pago médio', type:'number', format:r=>fmtBRL.format(r.avgPaid), sortValue:r=>r.avgPaid},
+];
+const ENVIO_PRAZO_COLUMNS = [
+  {key:'name', label:'Forma de envio', type:'text', format:r=>r.name, sortValue:r=>r.name},
+  {key:'count', label:'Pedidos', type:'number', format:r=>fmtInt.format(r.count), sortValue:r=>r.count},
+  {key:'prazo', label:'Prazo prometido (dias)', type:'number', format:r=>r.prazoN>0 ? r.prazo.toFixed(1).replace('.',',') : '—', sortValue:r=>r.prazoN>0 ? r.prazo : -1},
+  {key:'transit', label:'Envio → entrega (dias)', type:'number', format:r=>r.transitN>0 ? r.transit.toFixed(1).replace('.',',') : '—', sortValue:r=>r.transitN>0 ? r.transit : -1},
+  {key:'transitN', label:'Pedidos entregues', type:'number', format:r=>fmtInt.format(r.transitN), sortValue:r=>r.transitN},
+];
+
+// ordersEnvio[code] = [metodoIdx, cotado, pago, prazoPrometido, prazoUtil, diasEnvioEntrega]
+function renderEnvio(orders){
+  const joined = [];
+  for(const o of orders){
+    const e = ordersEnvio[o[0]];
+    if(e) joined.push({o, e, m: envioMetodos[e[0]], quoted: e[1], paid: e[2]||0});
+  }
+
+  const byM = new Map();
+  let quotedTotal = 0, paidTotal = 0, diffTotal = 0, qCount = 0, freeCount = 0;
+  for(const j of joined){
+    if(!byM.has(j.m)) byM.set(j.m, {count:0, revenue:0, qN:0, quoted:0, paid:0, diff:0, freeCount:0, prazo:0, prazoN:0, transit:0, transitN:0});
+    const m = byM.get(j.m);
+    m.count += 1; m.revenue += j.o[3];
+    paidTotal += j.paid;
+    if(j.quoted !== null && j.quoted !== undefined){
+      m.qN += 1; m.quoted += j.quoted; m.paid += j.paid; m.diff += j.quoted - j.paid;
+      quotedTotal += j.quoted; diffTotal += j.quoted - j.paid; qCount += 1;
+      if(j.paid === 0 && j.quoted > 0){ m.freeCount += 1; freeCount += 1; }
+    }
+    if(j.e[3] !== null && j.e[3] !== undefined){ m.prazo += j.e[3]; m.prazoN += 1; }
+    if(j.e[5] !== null && j.e[5] !== undefined && j.e[5] >= 0){ m.transit += j.e[5]; m.transitN += 1; }
+  }
+
+  const total = joined.length;
+  const comFrete = joined.filter(j=>j.quoted>0).length;
+  document.getElementById('envio-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Frete pago pelos clientes</p><p class="value">${fmtBRL.format(paidTotal)}</p><span class="delta flat">soma do frete cobrado</span></div>
+    <div class="kpi"><p class="label">Frete cotado (custo)</p><p class="value">${fmtBRL.format(quotedTotal)}</p><span class="delta flat">valor calculado no checkout</span></div>
+    <div class="kpi"><p class="label">Desconto no frete</p><p class="value">${fmtBRL.format(diffTotal)}</p><span class="delta flat">${quotedTotal>0 ? fmtPctPlain(diffTotal/quotedTotal*100) : '0,0%'} do frete cotado</span></div>
+    <div class="kpi"><p class="label">Pedidos com frete grátis</p><p class="value">${fmtInt.format(freeCount)}</p><span class="delta flat">${comFrete>0 ? fmtPctPlain(freeCount/comFrete*100) : '0,0%'} dos pedidos com frete</span></div>
+  `;
+  const coverage = orders.length>0 ? total/orders.length*100 : 0;
+  document.getElementById('envio-coverage-note').textContent =
+    `Dados de envio disponíveis para ${fmtPctPlain(coverage)} dos pedidos do período (${fmtInt.format(total)} de ${fmtInt.format(orders.length)}); ${fmtInt.format(qCount)} têm frete cotado registrado.`;
+
+  const methodRows = Array.from(byM.entries()).map(([name,v])=>({
+    name, count:v.count, revenue:v.revenue, pct: total>0 ? v.count/total*100 : 0,
+    ticket: v.count>0 ? v.revenue/v.count : 0,
+    qN:v.qN, quoted:v.quoted, paid:v.paid, diff:v.diff,
+    diffPct: v.quoted>0 ? v.diff/v.quoted*100 : 0,
+    freeCount:v.freeCount, freePct: v.qN>0 ? v.freeCount/v.qN*100 : 0,
+    avgQuoted: v.qN>0 ? v.quoted/v.qN : 0, avgPaid: v.qN>0 ? v.paid/v.qN : 0,
+    prazo: v.prazoN>0 ? v.prazo/v.prazoN : 0, prazoN:v.prazoN,
+    transit: v.transitN>0 ? v.transit/v.transitN : 0, transitN:v.transitN,
+  })).sort((a,b)=>b.count-a.count);
+
+  renderBarChart('chart-envio-metodo', methodRows.map(r=>r.name), methodRows.map(r=>r.count), 'Pedidos', false, null, v=>fmtInt.format(v));
+  renderSortableTable('table-envio-metodo', ENVIO_METODO_COLUMNS, methodRows);
+
+  const descRows = methodRows.filter(r=>r.qN>0 && r.quoted>0);
+  renderBarChart('chart-envio-desconto', descRows.map(r=>r.name), descRows.map(r=>r.diff), 'Desconto no frete');
+  renderSortableTable('table-envio-desconto', ENVIO_DESCONTO_COLUMNS, descRows);
+
+  renderSortableTable('table-envio-prazo', ENVIO_PRAZO_COLUMNS, methodRows);
+
+  const topMethods = methodRows.slice(0, 6).map(r=>r.name);
+  const byState = new Map();
+  for(const j of joined){
+    const geo = ordersGeo[j.o[0]];
+    if(!geo || !geo[0]) continue;
+    const st = geo[0];
+    if(!byState.has(st)) byState.set(st, {count:0, paid:0, diff:0, methods:new Map()});
+    const s = byState.get(st);
+    s.count += 1; s.paid += j.paid;
+    if(j.quoted !== null && j.quoted !== undefined) s.diff += j.quoted - j.paid;
+    s.methods.set(j.m, (s.methods.get(j.m)||0)+1);
+  }
+  const stateRows = Array.from(byState.entries()).map(([name,s])=>{
+    let topName = '', topN = 0;
+    s.methods.forEach((n,m)=>{ if(n>topN){ topN=n; topName=m; } });
+    const row = {name, count:s.count, top:topName, topPct: s.count>0 ? topN/s.count*100 : 0,
+                 avgPaid: s.count>0 ? s.paid/s.count : 0, diff:s.diff, share:{}};
+    topMethods.forEach(m=>{ row.share[m] = s.count>0 ? (s.methods.get(m)||0)/s.count*100 : 0; });
+    return row;
+  }).sort((a,b)=>b.count-a.count);
+
+  const stateColumns = [
+    {key:'name', label:'Estado', type:'text', format:r=>r.name, sortValue:r=>r.name},
+    {key:'count', label:'Pedidos', type:'number', format:r=>fmtInt.format(r.count), sortValue:r=>r.count},
+    {key:'top', label:'Mais usada', type:'text', cellClass:'', format:r=>`${r.top} (${fmtPctPlain(r.topPct)})`, sortValue:r=>r.top},
+    ...topMethods.map(m=>({key:'m_'+m, label:'% '+m, type:'number', format:r=>fmtPctPlain(r.share[m]), sortValue:r=>r.share[m]})),
+    {key:'avgPaid', label:'Frete pago médio', type:'number', format:r=>fmtBRL.format(r.avgPaid), sortValue:r=>r.avgPaid},
+    {key:'diff', label:'Desconto no frete', type:'number', format:r=>fmtBRL.format(r.diff), sortValue:r=>r.diff},
+  ];
+  const top10 = stateRows.slice(0, 10);
+  renderStackedPctChart('chart-envio-regiao', top10.map(r=>r.name),
+    topMethods.map(m=>({label:m, color:envioColor(m), data: top10.map(r=>r.share[m])})));
+  renderSortableTable('table-envio-regiao', stateColumns, stateRows);
+
+  const byMonth = new Map();
+  for(const j of joined){
+    const ym = j.o[1].slice(0,7);
+    if(!byMonth.has(ym)) byMonth.set(ym, {count:0, methods:new Map()});
+    const mo = byMonth.get(ym);
+    mo.count += 1;
+    mo.methods.set(j.m, (mo.methods.get(j.m)||0)+1);
+  }
+  const months = Array.from(byMonth.keys()).sort();
+  renderStackedPctChart('chart-envio-mes', months.map(ym=>ym.slice(5)+'/'+ym.slice(2,4)),
+    topMethods.map(m=>({label:m, color:envioColor(m), data: months.map(ym=>{
+      const mo = byMonth.get(ym); return mo.count>0 ? (mo.methods.get(m)||0)/mo.count*100 : 0;
+    })})));
+}
+
 const cupomPromoMap = DATA.cupons_promocoes || {};
 function promoNameForCoupon(coupon){
   const info = cupomPromoMap[coupon];
@@ -2539,6 +2727,7 @@ function renderPadroes(){
     renderGeo(orders);
     renderTamanho(start, end, status);
     renderPagamento(orders);
+    renderEnvio(orders);
   }catch(err){
     console.error('Falha ao renderizar Padrões:', err);
   }
@@ -2546,7 +2735,7 @@ function renderPadroes(){
 [fpStartInput, fpEndInput, fpStatusSelect].forEach(el=>el.addEventListener('change', renderPadroes));
 textFilterTamanho.addEventListener('input', ()=>renderTamanho(fpStartInput.value, fpEndInput.value, fpStatusSelect.value));
 categoriaTamanhoSel.addEventListener('change', ()=>renderTamanho(fpStartInput.value, fpEndInput.value, fpStatusSelect.value));
-['table-weekday','table-monthday','table-hour','table-turno','table-month','table-state','table-city','table-tamanho'].forEach(id=>attachSort(id, renderPadroes));
+['table-weekday','table-monthday','table-hour','table-turno','table-month','table-state','table-city','table-tamanho','table-pagamento-tipo','table-pagamento-parcelas','table-envio-metodo','table-envio-desconto','table-envio-regiao','table-envio-prazo'].forEach(id=>attachSort(id, renderPadroes));
 
 /* ---------------- TOP TAB: VENDAS ---------------- */
 

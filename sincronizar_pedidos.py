@@ -1,6 +1,6 @@
 import traceback
 from datetime import datetime
-from dashboard_lib import r2_pull_all, r2_push_all, sync_webhook_events, fetch_reposicoes_prazo, sync_handling_days, compute_expedicao, build_dashboard_data, build_final_html, deploy_github_pages, log_line
+from dashboard_lib import r2_pull_all, r2_push_all, sync_webhook_events, sync_envio, fetch_reposicoes_prazo, sync_handling_days, compute_expedicao, build_dashboard_data, build_final_html, deploy_github_pages, log_line
 
 if __name__ == "__main__":
     print(f"=== Sincronizacao via webhook iniciada: {datetime.now().isoformat(timespec='minutes')} ===")
@@ -8,6 +8,7 @@ if __name__ == "__main__":
     try:
         r2_pull_all()
         sync_webhook_events()
+        sync_envio()
         fetch_reposicoes_prazo()
         sync_handling_days()
         compute_expedicao()

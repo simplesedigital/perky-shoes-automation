@@ -76,6 +76,7 @@ STATE_FILES = [
     "historico_pageviews.csv",
     "historico_vendas.json",
     "historico_vendas_sku.json",
+    "orders_envio.json",
     "orders_master.json",
     "pedidos_itens.json",
     "reposicoes.json",
@@ -394,6 +395,72 @@ def backfill_pedidos_itens(start="2023-07-01"):
     save_json("pedidos_itens.json", pedidos_itens)
     com_email = sum(1 for v in pedidos_itens.values() if v["email"])
     print(f"[backfill] concluido: {len(pedidos_itens)} pedidos salvos em pedidos_itens.json ({com_email} com email)")
+
+
+def _summarize_packages(packages):
+    """Resume os pacotes de um pedido (VNDA /orders/{code}/packages) num registro compacto:
+    metodo, frete cotado (custo real da transportadora), frete pago pelo cliente, prazo
+    prometido e datas de envio/entrega."""
+    if not packages:
+        return None
+    first = packages[0]
+    quoted_vals = [p.get("quoted_shipping_price") for p in packages]
+    quoted = None if any(v is None for v in quoted_vals) else round(sum(quoted_vals), 2)
+    paid = round(sum((p.get("shipping_price") or 0.0) for p in packages), 2)
+    shipped = [p.get("shipped_at") for p in packages if p.get("shipped_at")]
+    delivered = [p.get("delivered_at") for p in packages]
+    all_delivered = all(delivered)
+    return {
+        "m": (first.get("shipping_label") or first.get("delivery_type") or "Sem informação").strip(),
+        "c": quoted, "p": paid,
+        "d": first.get("delivery_days"), "w": first.get("delivery_work_days"),
+        "s": min(shipped)[:10] if shipped else None,
+        "e": max(delivered)[:10] if all_delivered else None,
+        "u": date.today().isoformat(),
+    }
+
+
+def sync_envio(max_fetch=2000, workers=6):
+    """Mantem orders_envio.json (code -> resumo de envio). Busca pedidos ainda sem registro
+    e reconsulta, no maximo 1x/dia, os recentes ainda sem entrega. max_fetch limita o
+    volume por execucao (None = sem limite, usado no backfill local)."""
+    import concurrent.futures as cf
+    orders = load_json("orders_master.json", [])
+    envio = load_json("orders_envio.json", {})
+    today = date.today().isoformat()
+    recent_cut = (date.today() - timedelta(days=60)).isoformat()
+
+    missing = [o["code"] for o in orders if o.get("code") and o["code"] not in envio]
+    stale = [o["code"] for o in orders
+             if o.get("code") in envio and not envio[o["code"]].get("e")
+             and o.get("date", "") >= recent_cut and envio[o["code"]].get("u") != today]
+    todo = missing + stale
+    if max_fetch is not None:
+        todo = todo[:max_fetch]
+    if not todo:
+        print("[envio] nada novo pra buscar")
+        return
+
+    print(f"[envio] buscando pacotes de {len(todo)} pedidos ({len(missing)} novos, {len(stale)} a reconsultar)")
+
+    def fetch(code):
+        try:
+            return code, fetch_with_retry(f"https://api.vnda.com.br/api/v2/orders/{code}/packages")
+        except Exception as e:
+            log_line("envio", f"ERRO {code}: {type(e).__name__}: {e}")
+            return code, None
+
+    done = 0
+    for i in range(0, len(todo), 500):
+        chunk = todo[i:i + 500]
+        with cf.ThreadPoolExecutor(workers) as ex:
+            for code, pk in ex.map(fetch, chunk):
+                if pk is None:
+                    continue
+                envio[code] = _summarize_packages(pk) or {"x": 1, "u": today}
+        done += len(chunk)
+        save_json("orders_envio.json", envio)
+        print(f"[envio] {done}/{len(todo)}")
 
 
 def backfill_payment_data(start="2023-07-01"):
@@ -2580,6 +2647,17 @@ def build_dashboard_data():
                    o.get("payment_method"), o.get("installments"), o.get("card"), o.get("slip"), o.get("deposit")]
                   for o in orders_master if o["date"]]
 
+    envio_db = load_json("orders_envio.json", {})
+    envio_db = {c: dict(e, m=e["m"].strip()) for c, e in envio_db.items() if e.get("m")}
+    envio_metodos = sorted({e["m"] for e in envio_db.values()})
+    envio_idx = {m: i for i, m in enumerate(envio_metodos)}
+    orders_envio = {}
+    for code, e in envio_db.items():
+        transit = None
+        if e.get("s") and e.get("e"):
+            transit = (date.fromisoformat(e["e"]) - date.fromisoformat(e["s"])).days
+        orders_envio[code] = [envio_idx[e["m"]], e.get("c"), e.get("p"), e.get("d"), e.get("w"), transit]
+
     addr_db = load_json("banco_enderecos_pedidos.json", {})
     orders_geo = {}
     for code, addr in addr_db.items():
@@ -2651,6 +2729,8 @@ def build_dashboard_data():
         "discounts": discounts,
         "orders_raw": orders_raw,
         "orders_geo": orders_geo,
+        "orders_envio": orders_envio,
+        "envio_metodos": envio_metodos,
         "sales_by_sku": sales_by_sku,
         "crosssell": crosssell,
         "avise_me": avise_me,
