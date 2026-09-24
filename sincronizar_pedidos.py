@@ -8,10 +8,13 @@ if __name__ == "__main__":
     try:
         r2_pull_all()
         sync_webhook_events()
-        sync_envio()
         fetch_reposicoes_prazo()
         sync_handling_days()
         compute_expedicao()
+        try:
+            sync_envio(max_fetch=800, workers=3)
+        except Exception as e:
+            log_line("envio", f"AVISO: sync_envio falhou, seguindo sem atualizar envio: {type(e).__name__}: {e}")
         build_dashboard_data()
         build_final_html()
         r2_push_all()

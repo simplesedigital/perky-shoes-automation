@@ -9,7 +9,6 @@ if __name__ == "__main__":
         r2_pull_all()
         sync_webhook_events()
         sync_orders()
-        sync_envio()
         snapshot_estoque_desconto()
         fetch_product_pageviews()
         fetch_crm_channel_data()
@@ -22,6 +21,10 @@ if __name__ == "__main__":
         sync_handling_days()
         compute_estoque_deposito()
         compute_expedicao()
+        try:
+            sync_envio(max_fetch=800, workers=3)
+        except Exception as e:
+            log_line("envio", f"AVISO: sync_envio falhou, seguindo sem atualizar envio: {type(e).__name__}: {e}")
         build_dashboard_data()
         build_final_html()
         r2_push_all()
