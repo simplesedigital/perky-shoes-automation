@@ -292,6 +292,170 @@ def update_order_bump(content, yesterday):
     return content, len(new_daily), len(new_items)
 
 
+TERMS_EXTRA_PAGES = [
+    "https://www.yamysbaby.com/mochilas-de-maternidade",
+    "https://www.yamysbaby.com/linha-infantil/mochilas-infantis",
+    "https://www.yamysbaby.com/trocador-organizador/trocador-completo",
+    "https://www.yamysbaby.com/linha-infantil/lancheiras",
+    "https://www.yamysbaby.com/bolsas-acessorios/bolsao-yamys",
+    "https://www.yamysbaby.com/trocador-organizador/organizador-carrinho",
+    "https://www.yamysbaby.com/dia-das-criancas",
+    "https://www.yamysbaby.com/bolsa-maternidade-menino",
+]
+TERMS_EXTRA_TERMS = [
+    "mochila bebe",
+    "mochila infantil",
+    "mochila para bebe",
+    "mochila de maternidade",
+    "mochila pequena infantil",
+    "mochila de criança",
+    "mini mochila infantil",
+    "bolsa maternidade",
+    "bolsa maternidade moderna",
+    "kit enxoval",
+    "organizador de carrinho",
+    "dia das crianças",
+]
+
+
+def read_js_value(content, var_name):
+    marker = f"const {var_name} = "
+    start = content.index(marker) + len(marker)
+    value, length = json.JSONDecoder().raw_decode(content[start:])
+    return value, start, start + length
+
+
+def write_js_value(content, var_name, value):
+    _, start, end = read_js_value(content, var_name)
+    new_json = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return content[:start] + new_json + content[end:]
+
+
+def gsc_query_all(token, site_url, start_date, end_date, dimensions, dim_filter=None):
+    url = f"https://www.googleapis.com/webmasters/v3/sites/{urllib.parse.quote(site_url, safe='')}/searchAnalytics/query"
+    out, start_row, page_size = [], 0, 25000
+    while True:
+        body = {
+            "startDate": start_date,
+            "endDate": end_date,
+            "dimensions": dimensions,
+            "dataState": "all",
+            "rowLimit": page_size,
+            "startRow": start_row,
+        }
+        if dim_filter:
+            body["dimensionFilterGroups"] = [{"filters": [dim_filter]}]
+        status, resp = http_json(url, "POST", {"Authorization": f"Bearer {token}"}, body=body)
+        if status != 200:
+            raise RuntimeError(f"GSC query falhou ({status}): {resp}")
+        rows = resp.get("rows", [])
+        out.extend(rows)
+        if len(rows) < page_size:
+            return out
+        start_row += page_size
+
+
+def _series_row(r, date):
+    return [date, int(r["clicks"]), int(r["impressions"]), round(r["position"], 1)]
+
+
+def update_terms(content, token, yesterday):
+    page_series, _, _ = read_js_value(content, "pageDailySeries")
+    term_series, _, _ = read_js_value(content, "termDailySeries")
+    page_labels, _, _ = read_js_value(content, "pageLabels")
+    first_date = re.search(r'const TERMS_FIRST_DATE = "([^"]*)"', content).group(1)
+    last_date = re.search(r'const TERMS_LAST_DATE = "([^"]*)"', content).group(1)
+    existing_pages = set(page_series)
+    existing_terms = set(term_series)
+    added = {"pages": 0, "terms": 0}
+
+    # novas paginas/termos: historico completo, um filtro por item
+    for url in TERMS_EXTRA_PAGES:
+        if url in page_series:
+            continue
+        rows = gsc_query_all(token, GSC_SITE_URL, first_date, yesterday, ["date"],
+                             {"dimension": "page", "operator": "equals", "expression": url})
+        series = sorted((_series_row(r, r["keys"][0]) for r in rows if r["impressions"] > 0), key=lambda x: x[0])
+        if series:
+            page_series[url] = series
+            path = url.replace("https://www.yamysbaby.com/", "")
+            page_labels[url] = path or "Home"
+            added["pages"] += 1
+    for term in TERMS_EXTRA_TERMS:
+        if term in term_series:
+            continue
+        rows = gsc_query_all(token, GSC_SITE_URL, first_date, yesterday, ["date"],
+                             {"dimension": "query", "operator": "equals", "expression": term})
+        series = sorted((_series_row(r, r["keys"][0]) for r in rows if r["impressions"] > 0), key=lambda x: x[0])
+        if series:
+            term_series[term] = series
+            added["terms"] += 1
+
+    # itens que ja existiam: so os dias novos
+    start_new = (datetime.strptime(last_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    new_days = 0
+    if start_new <= yesterday:
+        for r in gsc_query_all(token, GSC_SITE_URL, start_new, yesterday, ["date", "page"]):
+            d, page = r["keys"]
+            if page in existing_pages and d > page_series[page][-1][0]:
+                page_series[page].append(_series_row(r, d))
+                new_days += 1
+        for r in gsc_query_all(token, GSC_SITE_URL, start_new, yesterday, ["date", "query"]):
+            d, term = r["keys"]
+            if term in existing_terms and d > term_series[term][-1][0]:
+                term_series[term].append(_series_row(r, d))
+        for series in list(page_series.values()) + list(term_series.values()):
+            series.sort(key=lambda x: x[0])
+
+    content = write_js_value(content, "pageDailySeries", page_series)
+    content = write_js_value(content, "termDailySeries", term_series)
+    content = write_js_value(content, "pageLabels", page_labels)
+    content, n = re.subn(r'const TERMS_LAST_DATE = "[^"]*"', f'const TERMS_LAST_DATE = "{yesterday}"', content)
+    if n != 1:
+        raise RuntimeError("Marcador 'TERMS_LAST_DATE' não encontrado (ou duplicado).")
+    return content, added, new_days
+
+
+def update_sales_daily(content, yesterday):
+    existing = parse_array(content, "salesDaily")
+    last_date = existing[-1]["date"]
+    start_date = (datetime.strptime(last_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    if start_date > yesterday:
+        return content, 0
+
+    token = get_vnda_token()
+    orders = fetch_orders_in_range(token, start_date, yesterday)
+    by_day = {}
+    for o in orders:
+        if o.get("status") == "canceled":
+            continue
+        d = (o.get("received_at") or "")[:10]
+        if not d:
+            continue
+        day = by_day.setdefault(d, {"orders": 0, "revenue": 0.0})
+        day["orders"] += 1
+        day["revenue"] += o.get("total") or 0
+
+    new_rows = []
+    cur = datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.strptime(yesterday, "%Y-%m-%d")
+    while cur <= end:
+        k = cur.strftime("%Y-%m-%d")
+        v = by_day.get(k, {"orders": 0, "revenue": 0.0})
+        new_rows.append({"date": k, "orders": v["orders"], "revenue": round(v["revenue"], 2)})
+        cur += timedelta(days=1)
+
+    content = replace_array(content, "salesDaily", existing + new_rows)
+    content, n = re.subn(
+        r'const SALES_LAST_DATE = "[^"]*"',
+        f'const SALES_LAST_DATE = "{new_rows[-1]["date"]}"',
+        content,
+    )
+    if n != 1:
+        raise RuntimeError("Marcador 'SALES_LAST_DATE' não encontrado (ou duplicado).")
+    return content, len(new_rows)
+
+
 def find_array_span(content, var_name):
     marker = f"const {var_name} = ["
     start = content.index(marker)
@@ -408,6 +572,18 @@ def main():
             log(f"Order Bump: {n_days} dia(s) novo(s), {n_items} item(ns) novo(s).")
         except Exception as e:
             log(f"AVISO: falha ao atualizar Order Bump, seguindo sem esse dado: {e}")
+
+        try:
+            html_content, added, n_days = update_terms(html_content, token, yesterday)
+            log(f"Termos & Páginas: {n_days} dia(s)/página novo(s), {added['pages']} página(s) e {added['terms']} termo(s) adicionados.")
+        except Exception as e:
+            log(f"AVISO: falha ao atualizar Termos & Páginas, seguindo sem esse dado: {e}")
+
+        try:
+            html_content, n_sales = update_sales_daily(html_content, yesterday)
+            log(f"Histórico de Vendas: {n_sales} dia(s) novo(s).")
+        except Exception as e:
+            log(f"AVISO: falha ao atualizar Histórico de Vendas, seguindo sem esse dado: {e}")
 
         push_html(github_token, sha, html_content)
         log("Publicado no GitHub Pages com sucesso.")
