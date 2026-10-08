@@ -519,7 +519,16 @@ def fetch_current_html(token):
     status, resp = http_json(api_url, "GET", headers)
     if status != 200:
         raise RuntimeError(f"Falha ao obter HTML atual do GitHub ({status}): {resp}")
-    content = base64.b64decode(resp["content"]).decode("utf-8")
+    # Acima de 1 MB a Contents API devolve "content" vazio; o formato raw funciona ate 100 MB.
+    raw_headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.raw+json",
+    }
+    req = urllib.request.Request(api_url, headers=raw_headers)
+    with urllib.request.urlopen(req, timeout=120) as r:
+        content = r.read().decode("utf-8")
+    if not content:
+        raise RuntimeError("HTML publicado veio vazio do GitHub.")
     return resp["sha"], content
 
 
