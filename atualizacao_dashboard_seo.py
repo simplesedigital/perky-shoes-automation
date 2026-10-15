@@ -456,6 +456,53 @@ def update_sales_daily(content, yesterday):
     return content, len(new_rows)
 
 
+def fetch_crm_rows(token, start_date, end_date):
+    """Sessoes/pedidos/receita de e-mail e WhatsApp por dia, repartidos em
+    ActiveCampaign (origem), produto-disponivel (campanha) e Outros.
+    Formato da linha: [data, acSess, acRec, acPed, pdSess, pdRec, pdPed, otSess, otRec, otPed]."""
+    url = f"https://analyticsdata.googleapis.com/v1beta/properties/{GA4_PROPERTY_ID}:runReport"
+    body = {
+        "dateRanges": [{"startDate": start_date, "endDate": end_date}],
+        "dimensions": [{"name": "date"}, {"name": "sessionSource"}, {"name": "sessionCampaignName"}],
+        "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}],
+        "dimensionFilter": {
+            "filter": {
+                "fieldName": "sessionSourceMedium",
+                "stringFilter": {"matchType": "PARTIAL_REGEXP", "value": "mail|whats", "caseSensitive": False},
+            }
+        },
+        "limit": 100000,
+    }
+    status, resp = http_json(url, "POST", {"Authorization": f"Bearer {token}"}, body=body)
+    if status != 200:
+        raise RuntimeError(f"GA4 CRM runReport falhou ({status}): {resp}")
+    by_day = {}
+    for row in resp.get("rows", []):
+        raw, source, campaign = (v["value"] for v in row["dimensionValues"])
+        sessions, tx, rev = int(row["metricValues"][0]["value"]), int(row["metricValues"][1]["value"]), float(row["metricValues"][2]["value"])
+        date = f"{raw[:4]}-{raw[4:6]}-{raw[6:8]}"
+        r = by_day.setdefault(date, [date] + [0, 0.0, 0] * 3)
+        base = 1 if source == "ActiveCampaign" else (4 if campaign == "produto-disponivel" else 7)
+        r[base] += sessions
+        r[base + 1] = round(r[base + 1] + rev, 2)
+        r[base + 2] += tx
+    rows, cur, end = [], datetime.strptime(start_date, "%Y-%m-%d"), datetime.strptime(end_date, "%Y-%m-%d")
+    while cur <= end:
+        k = cur.strftime("%Y-%m-%d")
+        rows.append(by_day.get(k, [k] + [0, 0.0, 0] * 3))
+        cur += timedelta(days=1)
+    return rows
+
+
+def update_crm(content, token, yesterday):
+    existing = parse_array(content, "crmDailyRaw")
+    start_date = (datetime.strptime(existing[-1][0], "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    if start_date > yesterday:
+        return content, 0
+    new_rows = fetch_crm_rows(token, start_date, yesterday)
+    return replace_array(content, "crmDailyRaw", existing + new_rows), len(new_rows)
+
+
 def find_array_span(content, var_name):
     marker = f"const {var_name} = ["
     start = content.index(marker)
@@ -593,6 +640,12 @@ def main():
             log(f"Histórico de Vendas: {n_sales} dia(s) novo(s).")
         except Exception as e:
             log(f"AVISO: falha ao atualizar Histórico de Vendas, seguindo sem esse dado: {e}")
+
+        try:
+            html_content, n_crm = update_crm(html_content, token, yesterday)
+            log(f"CRM: {n_crm} dia(s) novo(s).")
+        except Exception as e:
+            log(f"AVISO: falha ao atualizar CRM, seguindo sem esse dado: {e}")
 
         push_html(github_token, sha, html_content)
         log("Publicado no GitHub Pages com sucesso.")
