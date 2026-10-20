@@ -647,6 +647,17 @@ def main():
         except Exception as e:
             log(f"AVISO: falha ao atualizar CRM, seguindo sem esse dado: {e}")
 
+        try:
+            import atualizacao_activecampaign as ac
+            if ac.get_ac_config():
+                html_content, info = ac.update_activecampaign(
+                    html_content, token, yesterday, GA4_PROPERTY_ID, http_json)
+                log(f"ActiveCampaign: {info['campanhas']} campanha(s), {info['fluxos']} e-mail(s) de fluxo, {info['ativos']} contatos ativos.")
+            else:
+                log("ActiveCampaign: AC_API_URL/AC_API_KEY nao configurados, etapa pulada.")
+        except Exception as e:
+            log(f"AVISO: falha ao atualizar ActiveCampaign, seguindo sem esse dado: {e}")
+
         push_html(github_token, sha, html_content)
         log("Publicado no GitHub Pages com sucesso.")
 
