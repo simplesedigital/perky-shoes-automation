@@ -1,6 +1,6 @@
 import traceback
 from datetime import date
-from dashboard_lib import r2_pull_all, r2_push_all, sync_webhook_events, sync_envio, sync_orders, snapshot_estoque_desconto, fetch_product_pageviews, fetch_crm_channel_data, fetch_crm_automacoes_data, fetch_crm_transmissoes_data, fetch_bevean_segment_snapshots, fetch_coupon_promotions, fetch_avise_me, fetch_reposicoes_prazo, sync_handling_days, compute_estoque_deposito, compute_expedicao, build_dashboard_data, build_final_html, deploy_github_pages, log_line
+from dashboard_lib import r2_pull_all, r2_push_all, sync_webhook_events, sync_envio, sync_orders, snapshot_estoque_desconto, fetch_product_pageviews, fetch_crm_channel_data, fetch_seo_data, fetch_crm_automacoes_data, fetch_crm_transmissoes_data, fetch_bevean_segment_snapshots, fetch_coupon_promotions, fetch_avise_me, fetch_reposicoes_prazo, sync_handling_days, compute_estoque_deposito, compute_expedicao, build_dashboard_data, build_final_html, deploy_github_pages, log_line
 
 if __name__ == "__main__":
     print(f"=== Atualizacao diaria (pedidos + estoque + desconto) iniciada: {date.today().isoformat()} ===")
@@ -25,6 +25,10 @@ if __name__ == "__main__":
             sync_envio(max_fetch=800, workers=3)
         except Exception as e:
             log_line("envio", f"AVISO: sync_envio falhou, seguindo sem atualizar envio: {type(e).__name__}: {e}")
+        try:
+            fetch_seo_data()
+        except Exception as e:
+            log_line("seo", f"AVISO: fetch_seo_data falhou, seguindo sem atualizar a aba SEO: {type(e).__name__}: {e}")
         build_dashboard_data()
         build_final_html()
         r2_push_all()

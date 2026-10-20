@@ -74,6 +74,12 @@ STATE_FILES = [
     "historico_estoque_eventos.csv",
     "historico_estoque_sku.csv",
     "historico_pageviews.csv",
+    "historico_seo_ga4.csv",
+    "historico_seo_ga4_paginas.csv",
+    "historico_seo_gsc_consultas.csv",
+    "historico_seo_gsc_diario.csv",
+    "historico_seo_gsc_paginas.csv",
+    "seo_catalogo.json",
     "historico_vendas.json",
     "historico_vendas_sku.json",
     "orders_envio.json",
@@ -895,6 +901,207 @@ def fetch_crm_channel_data(days=400):
     print(f"[crm-canal] {len(rows)} linhas salvas (ultimos {days} dias) | "
           f"canal = origem/midia bate no regex parcial '{CRM_CHANNEL_REGEX}'")
     return rows
+
+
+# ---------------- PARTE 2I: SEO (GA4 organico + Search Console + catalogo VNDA) ----------------
+# Canal SEO = trafego organico do site. Tres fontes, todas com a mesma conta de servico:
+#  - GA4: sessoes, pedidos e receita dos canais "Organic Search" e "Organic Shopping"
+#    (por dia, e por pagina de entrada nos ultimos 90 dias).
+#  - Search Console: cliques, impressoes e posicao por dia (16 meses), com a quebra
+#    marca x sem marca, e por consulta e por pagina nos ultimos 90 dias.
+#  - VNDA: qualidade do catalogo (descricao de produtos e de paginas de categoria) e estoque.
+# O frontend agrega tudo no periodo escolhido, como na aba de CRM.
+SEO_GSC_SITE = "https://www.perkyshoes.com/"
+SEO_BRAND_TERM = "perky"
+SEO_ORGANIC_CHANNELS = ["Organic Search", "Organic Shopping"]
+SEO_TABLE_DAYS = 90
+SEO_GSC_DAILY_DAYS = 480
+SEO_GA4_DAYS = 400
+SEO_TAG_TYPES_IGNORADOS = {
+    "flag", "compre-junto", "guia-de-medidas", "bloco-horizontal", "descricao-bloco-1", "descricao-bloco-2",
+    "descricao-bloco-3", "recomendacao", "banner", "carrinho-sugeridos", "sugestoes-busca", "relacionado",
+    "cliente", "gm_category", "pdp-icones-produtos", "pdp-forma", "home-produtos-1", "home-produtos-2",
+    "home-produtos-3",
+}
+
+
+def _sa_token(scope):
+    from google.oauth2 import service_account
+    import google.auth.transport.requests
+
+    creds = service_account.Credentials.from_service_account_file(GOOGLE_SERVICE_ACCOUNT_FILE, scopes=[scope])
+    creds.refresh(google.auth.transport.requests.Request())
+    return creds.token
+
+
+def _seo_path(url):
+    """URL completa -> caminho sem dominio nem query string (junta variacoes com utm)."""
+    p = urllib.parse.urlsplit(url).path or "/"
+    if len(p) > 1:
+        p = p.rstrip("/")
+    return p
+
+
+def _write_csv_atomic(name, header, rows):
+    path = os.path.join(BASE_DIR, name)
+    tmp = path + f".tmp{os.getpid()}"
+    with open(tmp, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(header)
+        w.writerows(rows)
+    os.replace(tmp, path)
+
+
+def _gsc_query_all(token, start, end, dimensions, dimension_filter=None):
+    site = urllib.parse.quote(SEO_GSC_SITE, safe="")
+    url = f"https://www.googleapis.com/webmasters/v3/sites/{site}/searchAnalytics/query"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    rows, start_row = [], 0
+    while True:
+        body = {"startDate": start, "endDate": end, "dimensions": dimensions, "rowLimit": 25000,
+                "startRow": start_row, "dataState": "final"}
+        if dimension_filter:
+            body["dimensionFilterGroups"] = [{"groupType": "and", "filters": dimension_filter}]
+        data = _urlopen_json_retry(urllib.request.Request(url, data=json.dumps(body).encode(), method="POST", headers=headers))
+        got = data.get("rows", [])
+        rows.extend(got)
+        if len(got) < 25000:
+            break
+        start_row += 25000
+    return rows
+
+
+def _strip_html(s):
+    import html as _html
+    s = re.sub(r"<[^>]+>", " ", s or "")
+    return re.sub(r"\s+", " ", _html.unescape(s)).strip()
+
+
+def _seo_catalogo():
+    produtos = fetch_all_products()
+
+    estoque_por_produto, ultimo = {}, None
+    path = os.path.join(BASE_DIR, "historico_estoque_sku.csv")
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as f:
+            linhas = list(csv.DictReader(f))
+        ultimo = max((r["data"] for r in linhas), default=None)
+        for r in linhas:
+            if r["data"] == ultimo and r.get("product_id"):
+                try:
+                    estoque_por_produto[r["product_id"]] = estoque_por_produto.get(r["product_id"], 0) + int(float(r["estoque"] or 0))
+                except ValueError:
+                    pass
+
+    prods = {}
+    for p in produtos:
+        desc = _strip_html(p.get("plain_description") or p.get("description") or "")
+        prods[str(p["id"])] = [p["reference"], p["name"].strip(), estoque_por_produto.get(str(p["id"]), 0),
+                               len(desc), 1 if p.get("active") else 0]
+
+    tags, pg = {}, 1
+    while True:
+        data = fetch_with_retry(f"https://api.vnda.com.br/api/v2/tags?per_page=100&page={pg}")
+        if not data:
+            break
+        for t in data:
+            tipo = t.get("type")
+            if tipo in SEO_TAG_TYPES_IGNORADOS or not t.get("products_count"):
+                continue
+            tags[t["name"]] = [(t.get("title") or "").strip(), len(_strip_html(t.get("description") or "")),
+                               tipo or "", t.get("products_count") or 0]
+        if len(data) < 100:
+            break
+        pg += 1
+        if pg > 10:
+            break
+    return {"produtos": prods, "tags": tags, "estoque_em": ultimo}
+
+
+def fetch_seo_data():
+    ga_token = _sa_token("https://www.googleapis.com/auth/analytics.readonly")
+    ga_headers = {"Authorization": f"Bearer {ga_token}", "Content-Type": "application/json"}
+    ga_url = f"https://analyticsdata.googleapis.com/v1beta/properties/{GA4_PROPERTY_ID}:runReport"
+    canal_filter = {"filter": {"fieldName": "sessionDefaultChannelGroup",
+                               "inListFilter": {"values": SEO_ORGANIC_CHANNELS}}}
+
+    def ga_report(dimensions, days):
+        body = json.dumps({
+            "dateRanges": [{"startDate": f"{days}daysAgo", "endDate": "today"}],
+            "dimensions": [{"name": d} for d in dimensions],
+            "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}],
+            "dimensionFilter": canal_filter, "limit": 100000,
+        }).encode()
+        data = _urlopen_json_retry(urllib.request.Request(ga_url, data=body, method="POST", headers=ga_headers))
+        out = []
+        for row in data.get("rows", []):
+            dv = [x["value"] for x in row["dimensionValues"]]
+            mv = row["metricValues"]
+            d = dv[0]
+            out.append([f"{d[:4]}-{d[4:6]}-{d[6:8]}"] + dv[1:] + [int(mv[0]["value"]), int(float(mv[1]["value"])), round(float(mv[2]["value"]), 2)])
+        out.sort(key=lambda r: r[0])
+        return out
+
+    ga_diario = ga_report(["date", "sessionDefaultChannelGroup"], SEO_GA4_DAYS)
+    _write_csv_atomic("historico_seo_ga4.csv", ["data", "canal", "sessoes", "pedidos", "receita"], ga_diario)
+
+    ga_pag = ga_report(["date", "landingPage"], SEO_TABLE_DAYS)
+    ga_pag = [[r[0], _seo_path(r[1]) if r[1].startswith("http") else (r[1].split("?")[0] or "/"), r[2], r[3], r[4]] for r in ga_pag]
+    agg = {}
+    for d, pagina, s, o, rev in ga_pag:
+        k = (d, pagina)
+        a = agg.setdefault(k, [0, 0, 0.0])
+        a[0] += s; a[1] += o; a[2] += rev
+    ga_pag = [[d, p, v[0], v[1], round(v[2], 2)] for (d, p), v in sorted(agg.items())]
+    _write_csv_atomic("historico_seo_ga4_paginas.csv", ["data", "pagina", "sessoes", "pedidos", "receita"], ga_pag)
+
+    gsc_token = _sa_token("https://www.googleapis.com/auth/webmasters.readonly")
+    hoje = date.today()
+    ini_diario = (hoje - timedelta(days=SEO_GSC_DAILY_DAYS)).isoformat()
+    ini_tabelas = (hoje - timedelta(days=SEO_TABLE_DAYS)).isoformat()
+    fim = hoje.isoformat()
+
+    diario = []
+    for tipo, filtro in (("total", None),
+                         ("marca", [{"dimension": "query", "operator": "contains", "expression": SEO_BRAND_TERM}])):
+        for r in _gsc_query_all(gsc_token, ini_diario, fim, ["date"], filtro):
+            diario.append([r["keys"][0], tipo, int(r["clicks"]), int(r["impressions"]), round(r["position"], 2)])
+    diario.sort(key=lambda r: (r[0], r[1]))
+    _write_csv_atomic("historico_seo_gsc_diario.csv", ["data", "tipo", "cliques", "impressoes", "posicao"], diario)
+
+    consultas = [[r["keys"][0], r["keys"][1], int(r["clicks"]), int(r["impressions"]), round(r["position"], 2)]
+                 for r in _gsc_query_all(gsc_token, ini_tabelas, fim, ["date", "query"])]
+    consultas.sort(key=lambda r: (r[0], -r[3]))
+    _write_csv_atomic("historico_seo_gsc_consultas.csv", ["data", "consulta", "cliques", "impressoes", "posicao"], consultas)
+
+    agg = {}
+    for r in _gsc_query_all(gsc_token, ini_tabelas, fim, ["date", "page"]):
+        k = (r["keys"][0], _seo_path(r["keys"][1]))
+        a = agg.setdefault(k, [0, 0, 0.0])
+        a[0] += r["clicks"]; a[1] += r["impressions"]; a[2] += r["position"] * r["impressions"]
+    paginas = [[d, p, int(v[0]), int(v[1]), round(v[2] / v[1], 2) if v[1] else 0] for (d, p), v in sorted(agg.items())]
+    _write_csv_atomic("historico_seo_gsc_paginas.csv", ["data", "pagina", "cliques", "impressoes", "posicao"], paginas)
+
+    sitemaps = []
+    try:
+        site = urllib.parse.quote(SEO_GSC_SITE, safe="")
+        data = _urlopen_json_retry(urllib.request.Request(
+            f"https://www.googleapis.com/webmasters/v3/sites/{site}/sitemaps", headers={"Authorization": f"Bearer {gsc_token}"}))
+        for s in data.get("sitemap", []):
+            sitemaps.append({"caminho": s.get("path"), "baixado_em": (s.get("lastDownloaded") or "")[:10],
+                             "erros": int(s.get("errors") or 0), "avisos": int(s.get("warnings") or 0),
+                             "conteudo": [{"tipo": c.get("type"), "enviadas": int(c.get("submitted") or 0),
+                                           "indexadas": int(c.get("indexed") or 0)} for c in s.get("contents", [])]})
+    except Exception as e:
+        log_line("seo", f"AVISO: sitemaps do Search Console indisponiveis: {type(e).__name__}: {e}")
+
+    catalogo = _seo_catalogo()
+    catalogo["sitemaps"] = sitemaps
+    save_json("seo_catalogo.json", catalogo)
+
+    print(f"[seo] GA4 {len(ga_diario)} linhas diarias + {len(ga_pag)} de paginas | "
+          f"GSC {len(diario)} diarias, {len(consultas)} consultas, {len(paginas)} paginas | "
+          f"catalogo {len(catalogo['produtos'])} produtos, {len(catalogo['tags'])} tags")
 
 
 # ---------------- PARTE 2H: AUTOMACOES E TRANSMISSOES DE E-MAIL (GA4, via utm_content) ----------------
@@ -2574,6 +2781,35 @@ def build_dashboard_data():
             crm_canal_rows = [[r["data"], r["origem_midia"], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])]
                                for r in csv.DictReader(f)]
 
+    def _ler_csv(nome):
+        caminho = os.path.join(BASE_DIR, nome)
+        if not os.path.isfile(caminho):
+            return []
+        with open(caminho, encoding="utf-8") as f:
+            return list(csv.DictReader(f))
+
+    def _indexar(valores):
+        lista, idx = [], {}
+        for v in valores:
+            if v not in idx:
+                idx[v] = len(lista)
+                lista.append(v)
+        return lista, idx
+
+    seo_ga4_rows = [[r["data"], r["canal"], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])]
+                    for r in _ler_csv("historico_seo_ga4.csv")]
+    seo_gsc_diario = [[r["data"], r["tipo"], int(r["cliques"]), int(r["impressoes"]), float(r["posicao"])]
+                      for r in _ler_csv("historico_seo_gsc_diario.csv")]
+    _gc = _ler_csv("historico_seo_gsc_consultas.csv")
+    seo_consultas_lista, _ci = _indexar(r["consulta"] for r in _gc)
+    seo_gsc_consultas = [[r["data"], _ci[r["consulta"]], int(r["cliques"]), int(r["impressoes"]), float(r["posicao"])] for r in _gc]
+    _gp = _ler_csv("historico_seo_gsc_paginas.csv")
+    _ga = _ler_csv("historico_seo_ga4_paginas.csv")
+    seo_paginas_lista, _pi = _indexar([r["pagina"] for r in _gp] + [r["pagina"] for r in _ga])
+    seo_gsc_paginas = [[r["data"], _pi[r["pagina"]], int(r["cliques"]), int(r["impressoes"]), float(r["posicao"])] for r in _gp]
+    seo_ga4_paginas = [[r["data"], _pi[r["pagina"]], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])] for r in _ga]
+    seo_catalogo = load_json("seo_catalogo.json", {})
+
     crm_transmissoes_path = os.path.join(BASE_DIR, "historico_crm_transmissoes.csv")
     crm_transmissoes_rows = []
     if os.path.isfile(crm_transmissoes_path):
@@ -2723,6 +2959,14 @@ def build_dashboard_data():
         "sales_names": sales["names"],
         "pageviews_rows": pageviews_rows,
         "crm_canal_rows": crm_canal_rows,
+        "seo_ga4_rows": seo_ga4_rows,
+        "seo_gsc_diario": seo_gsc_diario,
+        "seo_consultas_lista": seo_consultas_lista,
+        "seo_gsc_consultas": seo_gsc_consultas,
+        "seo_paginas_lista": seo_paginas_lista,
+        "seo_gsc_paginas": seo_gsc_paginas,
+        "seo_ga4_paginas": seo_ga4_paginas,
+        "seo_catalogo": seo_catalogo,
         "crm_automacoes_rows": crm_automacoes_rows,
         "crm_transmissoes_rows": crm_transmissoes_rows,
         "stock_sku": stock_sku,

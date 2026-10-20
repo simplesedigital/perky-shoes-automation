@@ -384,6 +384,7 @@ tbody tr:last-child td{border-bottom:none;}
 <div class="tabbar" id="top-tabbar" role="tablist">
   <button class="tabbtn" id="topbtn-vendas" role="tab" aria-selected="true" onclick="switchTopTab('vendas')">Vendas</button>
   <button class="tabbtn" id="topbtn-crm" role="tab" aria-selected="false" onclick="switchTopTab('crm')">CRM</button>
+  <button class="tabbtn" id="topbtn-seo" role="tab" aria-selected="false" onclick="switchTopTab('seo')">SEO</button>
   <button class="tabbtn" id="topbtn-produto" role="tab" aria-selected="false" onclick="switchTopTab('produto')">Produto</button>
   <button class="tabbtn" id="topbtn-deposito" role="tab" aria-selected="false" onclick="switchTopTab('deposito')">Logística</button>
   <button class="tabbtn" id="topbtn-padroes" role="tab" aria-selected="false" onclick="switchTopTab('padroes')">Padrões</button>
@@ -1175,6 +1176,124 @@ tbody tr:last-child td{border-bottom:none;}
   </div>
 </div>
 
+<!-- ================= TOP TAB: SEO ================= -->
+<div class="panel" id="toppanel-seo">
+  <div class="tabbar sub" role="tablist">
+    <button class="tabbtn" id="seobtn-geral" role="tab" aria-selected="true" onclick="switchSeoSub('geral')">Visão geral</button>
+    <button class="tabbtn" id="seobtn-consultas" role="tab" aria-selected="false" onclick="switchSeoSub('consultas')">Consultas</button>
+    <button class="tabbtn" id="seobtn-paginas" role="tab" aria-selected="false" onclick="switchSeoSub('paginas')">Páginas</button>
+    <button class="tabbtn" id="seobtn-catalogo" role="tab" aria-selected="false" onclick="switchSeoSub('catalogo')">Catálogo e indexação</button>
+  </div>
+
+  <div class="subpanel active" id="seopanel-geral">
+    <div class="card">
+      <div class="filterbar">
+        <div class="field">
+          <label>Período</label>
+          <button type="button" class="dr-trigger" id="seo-daterange-btn"></button>
+          <input type="date" id="seo-start" style="display:none;">
+          <input type="date" id="seo-end" style="display:none;">
+        </div>
+        <span class="hint" id="seo-compare-hint"></span>
+      </div>
+    </div>
+    <p class="footnote" style="margin-top:-6px;">Tráfego orgânico = Google (Search Console) mais as sessões dos canais Organic Search e Organic Shopping do GA4. O Search Console tem atraso de 2 a 3 dias nos dados mais recentes. Pedidos e receita vêm do GA4, que conta também pedidos que depois são cancelados.</p>
+
+    <div class="section-title">Google (Search Console)</div>
+    <div class="kpirow" id="seo-gsc-kpirow"></div>
+    <div class="section-title" style="margin-top:1.25rem;">Tráfego orgânico no site (GA4)</div>
+    <div class="kpirow" id="seo-ga4-kpirow"></div>
+
+    <div class="controls-row" style="margin-top:1.25rem;">
+      <div class="seg" id="seg-gran-seo">
+        <button aria-pressed="true" data-v="day">Dia</button>
+        <button aria-pressed="false" data-v="week">Semana</button>
+        <button aria-pressed="false" data-v="month">Mês</button>
+      </div>
+    </div>
+    <div class="section-title">Cliques e impressões no Google</div>
+    <div class="chartwrap" style="height:280px;"><canvas id="chart-seo-gsc" role="img" aria-label="Cliques e impressões no Google ao longo do tempo"></canvas></div>
+    <div class="section-title" style="margin-top:1.75rem;">Sessões e receita do tráfego orgânico</div>
+    <div class="chartwrap" style="height:280px;"><canvas id="chart-seo-ga4" role="img" aria-label="Sessões e receita orgânica ao longo do tempo"></canvas></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Marca x sem marca</div>
+    <p class="footnote" style="margin-top:-6px;">Marca = consultas que contêm "perky" (inclui "perky shoes"). Sem marca é a demanda que o SEO realmente conquista: pessoas que ainda não conhecem a loja.</p>
+    <div class="tablewrap"><table id="table-seo-marca"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="seopanel-consultas">
+    <div class="card">
+      <div class="filterbar">
+        <div class="field">
+          <label>Período</label>
+          <button type="button" class="dr-trigger" id="seoq-daterange-btn"></button>
+          <input type="date" id="seoq-start" style="display:none;">
+          <input type="date" id="seoq-end" style="display:none;">
+        </div>
+        <div class="field">
+          <label for="seoq-tipo">Tipo de consulta</label>
+          <select id="seoq-tipo"><option value="all">Todas</option><option value="marca">Marca</option><option value="sem">Sem marca</option></select>
+        </div>
+        <div class="field">
+          <label for="seoq-texto">Buscar consulta</label>
+          <input type="text" id="seoq-texto" placeholder="ex: alpargata">
+        </div>
+        <span class="hint" id="seoq-compare-hint"></span>
+      </div>
+    </div>
+    <div class="kpirow" id="seoq-kpirow"></div>
+
+    <div class="section-title">Oportunidades: sem marca, entre as posições 4 e 20</div>
+    <p class="footnote" style="margin-top:-6px;">Consultas que já aparecem na primeira ou segunda página e têm impressões no período. Melhorar título, descrição e conteúdo da página que responde a elas é o caminho mais curto para ganhar cliques.</p>
+    <div class="tablewrap maxh"><table id="table-seo-oport"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Todas as consultas</div>
+    <p class="footnote" id="seoq-nota" style="margin-top:-6px;"></p>
+    <div class="tablewrap maxh"><table id="table-seo-consultas"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="seopanel-paginas">
+    <div class="card">
+      <div class="filterbar">
+        <div class="field">
+          <label>Período</label>
+          <button type="button" class="dr-trigger" id="seop-daterange-btn"></button>
+          <input type="date" id="seop-start" style="display:none;">
+          <input type="date" id="seop-end" style="display:none;">
+        </div>
+        <div class="field">
+          <label for="seop-tipo">Tipo de página</label>
+          <select id="seop-tipo"><option value="all">Todas</option><option value="Produto">Produto</option><option value="Categoria">Categoria</option><option value="Home">Home</option><option value="Institucional">Institucional</option><option value="Outro">Outro</option></select>
+        </div>
+        <div class="field">
+          <label for="seop-texto">Buscar página</label>
+          <input type="text" id="seop-texto" placeholder="ex: sandalia">
+        </div>
+        <span class="hint" id="seop-compare-hint"></span>
+      </div>
+    </div>
+    <div class="kpirow" id="seop-kpirow"></div>
+    <p class="footnote" style="margin-top:-6px;">Cliques e impressões vêm do Google. Sessões, pedidos e receita são do GA4, atribuídos à página de entrada da sessão orgânica. Páginas de produto com impressões e sem estoque aparecem destacadas.</p>
+    <div class="tablewrap maxh"><table id="table-seo-paginas"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="seopanel-catalogo">
+    <p class="footnote">Visão dos últimos 90 dias do Search Console cruzada com o catálogo da VNDA e com o status do sitemap.</p>
+    <div class="kpirow" id="seoc-kpirow"></div>
+
+    <div class="section-title">Sitemap no Google</div>
+    <div class="tablewrap"><table id="table-seo-sitemap"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Produtos com impressões e sem estoque</div>
+    <p class="footnote" style="margin-top:-6px;">O Google ainda mostra essas páginas, mas o cliente não consegue comprar. Vale repor, redirecionar ou oferecer produto parecido.</p>
+    <div class="tablewrap maxh"><table id="table-seo-semestoque"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Páginas de categoria e coleção</div>
+    <p class="footnote" style="margin-top:-6px;">Título e descrição vêm do cadastro da tag na VNDA. O texto de SEO da página também pode estar em banners da VNDA, que não são lidos aqui: confira a página antes de agir.</p>
+    <div class="tablewrap maxh"><table id="table-seo-categorias"><thead></thead><tbody></tbody></table></div>
+  </div>
+</div>
+
 <script>
 /*__CHARTJS__*/
 </script>
@@ -1195,11 +1314,12 @@ function matchCategoria(sel, referencia){
 }
 
 function switchTopTab(name){
-  ['padroes','produto','deposito','vendas','crm'].forEach(n=>{
+  ['padroes','produto','deposito','vendas','crm','seo'].forEach(n=>{
     document.getElementById('toppanel-'+n).classList.toggle('active', n===name);
     document.getElementById('topbtn-'+n).setAttribute('aria-selected', n===name);
   });
   if(name==='deposito'){ safeRun(renderDepositoSaudeCharts, 'gráfico do Depósito'); safeRun(renderExpedicao, 'painel de Expedição'); }
+  if(name==='seo' && typeof renderSeoAll==='function'){ safeRun(renderSeoAll, 'painel de SEO'); }
   syncDynamicSticky();
   updateRoute();
 }
@@ -1242,6 +1362,16 @@ function switchVendasSub(name){
   updateRoute();
 }
 
+function switchSeoSub(name){
+  ['geral','consultas','paginas','catalogo'].forEach(n=>{
+    document.getElementById('seopanel-'+n).classList.toggle('active', n===name);
+    document.getElementById('seobtn-'+n).setAttribute('aria-selected', n===name);
+  });
+  syncDynamicSticky();
+  updateRoute();
+  if(typeof renderSeoAll==='function') safeRun(renderSeoAll, 'painel de SEO');
+}
+
 function switchCrmSub(name){
   ['email','automacoes','transmissoes','calendario'].forEach(n=>{
     document.getElementById('crmpanel-'+n).classList.toggle('active', n===name);
@@ -1256,6 +1386,7 @@ function switchCrmSub(name){
 // fora dele (local, file://) usa hash (#/crm/canal).
 const ROUTES = {
   vendas:   {slug:'vendas',   btn:'vdbtn-',  sw:switchVendasSub,    subs:{cupons:'cupons'}},
+  seo:      {slug:'seo',      btn:'seobtn-', sw:switchSeoSub,       subs:{geral:'visao-geral', consultas:'consultas', paginas:'paginas', catalogo:'catalogo'}},
   crm:      {slug:'crm',      btn:'crmbtn-', sw:switchCrmSub,       subs:{email:'canal', automacoes:'automacoes', transmissoes:'transmissoes', calendario:'calendario'}},
   produto:  {slug:'produto',  btn:'tabbtn-', sw:switchTab,          subs:{abc:'curva-abc', estoque:'estoque', desconto:'descontos', crosssell:'venda-cruzada', 'avise-me':'demanda-reprimida', reposicoes:'reposicoes', compras:'compras'}},
   deposito: {slug:'logistica',btn:'depbtn-', sw:switchDepositoSub,  subs:{prateleiras:'deposito', expedicao:'expedicao'}},
@@ -1690,6 +1821,7 @@ function applyTheme(theme, rerender){
       safeRun(render, 'gráficos (troca de tema)');
       safeRun(renderPadroes, 'Padrões (troca de tema)');
       safeRun(renderDepositoSaudeCharts, 'gráfico do Depósito (troca de tema)');
+      if(typeof renderSeoAll==='function') safeRun(renderSeoAll, 'SEO (troca de tema)');
     });
   }
 }
@@ -1710,7 +1842,7 @@ function syncDynamicSticky(){
   if(movedSub && movedSubPh){ movedSubPh.replaceWith(movedSub); movedSub=null; movedSubPh=null; }
   if(movedCard && movedCardPh){ movedCardPh.replaceWith(movedCard); movedCard=null; movedCardPh=null; }
   if(!headerPinned) return;
-  const topPanel = document.querySelector('#toppanel-padroes.active, #toppanel-produto.active, #toppanel-deposito.active, #toppanel-vendas.active, #toppanel-crm.active');
+  const topPanel = document.querySelector('#toppanel-padroes.active, #toppanel-produto.active, #toppanel-deposito.active, #toppanel-vendas.active, #toppanel-crm.active, #toppanel-seo.active');
   const sub = topPanel ? topPanel.querySelector(':scope > .tabbar.sub') : null;
   const leafPanel = topPanel ? (topPanel.querySelector(':scope > .panel.active') || topPanel) : null;
   const card = leafPanel ? (leafPanel.querySelector(':scope > .card') || leafPanel.querySelector(':scope > .subpanel.active > .card')) : null;
@@ -2902,6 +3034,383 @@ attachSort('table-crm-origem', renderCrm);
 if(crmMaxDate){
   [crmStartInput, crmEndInput].forEach(el=>el.addEventListener('change', renderCrm));
   renderCrm();
+}
+
+/* ---------------- TOP TAB: SEO ---------------- */
+
+const seoGa4Rows = DATA.seo_ga4_rows || [];             // [data, canal, sessoes, pedidos, receita]
+const seoGscDiario = DATA.seo_gsc_diario || [];         // [data, tipo (total|marca), cliques, impressoes, posicao]
+const seoConsultasLista = DATA.seo_consultas_lista || [];
+const seoGscConsultas = DATA.seo_gsc_consultas || [];   // [data, idxConsulta, cliques, impressoes, posicao]
+const seoPaginasLista = DATA.seo_paginas_lista || [];
+const seoGscPaginas = DATA.seo_gsc_paginas || [];       // [data, idxPagina, cliques, impressoes, posicao]
+const seoGa4Paginas = DATA.seo_ga4_paginas || [];       // [data, idxPagina, sessoes, pedidos, receita]
+const seoCatalogo = DATA.seo_catalogo || {};
+const seoProdutos = seoCatalogo.produtos || {};         // id -> [referencia, nome, estoque, tamanhoDescricao, ativo]
+const seoTags = seoCatalogo.tags || {};                 // nome -> [titulo, tamanhoDescricao, tipo, nProdutos]
+const seoSitemaps = seoCatalogo.sitemaps || [];
+
+const seoMinOf = arr => arr.reduce((m,r)=> (m===''||r[0]<m)?r[0]:m, '');
+const seoMaxOf = arr => arr.reduce((m,r)=> r[0]>m?r[0]:m, '');
+const seoMinDate = [seoMinOf(seoGscDiario), seoMinOf(seoGa4Rows)].filter(Boolean).sort()[0];
+const seoMaxDate = [seoMaxOf(seoGscDiario), seoMaxOf(seoGa4Rows)].filter(Boolean).sort().slice(-1)[0];
+const seoTabMin = seoMinOf(seoGscConsultas), seoTabMax = seoMaxOf(seoGscConsultas);
+const seoHasData = !!seoMaxDate;
+
+const seoEsc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const seoIsMarca = q => /perky/i.test(q);
+const fmtPos = v => v>0 ? v.toFixed(1).replace('.',',') : '—';
+
+function seoSetupPeriod(prefix, minD, maxD, defStart, defEnd){
+  const s = document.getElementById(prefix+'-start'), e = document.getElementById(prefix+'-end');
+  s.min = minD; e.min = minD; s.max = maxD; e.max = maxD;
+  s.value = defStart; e.value = defEnd;
+  initDateRangePicker(prefix+'-daterange-btn', prefix+'-start', prefix+'-end');
+  return [s, e];
+}
+function seoPrevRange(start, end){
+  const dur = dayDiff(start,end)+1;
+  const prevEnd = addDays(start,-1);
+  return [addDays(prevEnd, -(dur-1)), prevEnd];
+}
+function seoPosDeltaHTML(cur, prev){
+  if(!prev || !cur) return '<span class="delta flat">sem base de comparação</span>';
+  const d = cur - prev;
+  const cls = d<-0.05?'up':(d>0.05?'down':'flat');
+  const arrow = d<-0.05?'&#8599;':(d>0.05?'&#8600;':'&#8594;');
+  return `<span class="delta ${cls}">${arrow} ${Math.abs(d).toFixed(1).replace('.',',')} posições vs período anterior</span>`;
+}
+
+let seoStartInput = null, seoEndInput = null, seoqStartInput = null, seoqEndInput = null, seopStartInput = null, seopEndInput = null;
+if(seoHasData){
+  let a = fpStartInput.value < seoMinDate ? seoMinDate : fpStartInput.value;
+  let b = fpEndInput.value > seoMaxDate ? seoMaxDate : fpEndInput.value;
+  if(b < a){ a = seoMinDate; b = seoMaxDate; }
+  [seoStartInput, seoEndInput] = seoSetupPeriod('seo', seoMinDate, seoMaxDate, a, b);
+  if(seoTabMax){
+    const ts = addDays(seoTabMax,-27) < seoTabMin ? seoTabMin : addDays(seoTabMax,-27);
+    [seoqStartInput, seoqEndInput] = seoSetupPeriod('seoq', seoTabMin, seoTabMax, ts, seoTabMax);
+    [seopStartInput, seopEndInput] = seoSetupPeriod('seop', seoTabMin, seoTabMax, ts, seoTabMax);
+  }
+}
+
+/* ---- agregacoes ---- */
+function seoGscAgg(start, end, tipo){
+  let c=0, i=0, pw=0;
+  for(const r of seoGscDiario){
+    if(r[1]!==tipo || r[0]<start || r[0]>end) continue;
+    c += r[2]; i += r[3]; pw += r[4]*r[3];
+  }
+  return {clicks:c, impr:i, ctr: i>0 ? c/i*100 : 0, pos: i>0 ? pw/i : 0};
+}
+function seoGa4Agg(start, end){
+  let s=0, o=0, rev=0;
+  for(const r of seoGa4Rows){ if(r[0]<start || r[0]>end) continue; s += r[2]; o += r[3]; rev += r[4]; }
+  return {sessions:s, orders:o, revenue:rev, conv: s>0 ? o/s*100 : 0};
+}
+function seoBucket(gran){ return gran==='week' ? isoWeekStart : (gran==='month' ? monthKey : (d=>d)); }
+function seoGscSeries(start, end, gran){
+  const key = seoBucket(gran), m = new Map();
+  for(const r of seoGscDiario){
+    if(r[1]!=='total' || r[0]<start || r[0]>end) continue;
+    const k = key(r[0]); const b = m.get(k) || {c:0, i:0};
+    b.c += r[2]; b.i += r[3]; m.set(k, b);
+  }
+  return Array.from(m.entries()).sort((a,b)=> a[0]<b[0]?-1:1);
+}
+function seoGa4Series(start, end, gran){
+  const key = seoBucket(gran), m = new Map();
+  for(const r of seoGa4Rows){
+    if(r[0]<start || r[0]>end) continue;
+    const k = key(r[0]); const b = m.get(k) || {s:0, rev:0};
+    b.s += r[2]; b.rev += r[4]; m.set(k, b);
+  }
+  return Array.from(m.entries()).sort((a,b)=> a[0]<b[0]?-1:1);
+}
+
+const seoCharts = {};
+function seoLineChart(key, canvasId, labels, datasets){
+  if(typeof Chart === 'undefined') return;
+  if(seoCharts[key]) seoCharts[key].destroy();
+  const css = getComputedStyle(document.documentElement);
+  const muted = css.getPropertyValue('--text-muted'), grid = css.getPropertyValue('--grid'), primary = css.getPropertyValue('--text-primary');
+  seoCharts[key] = new Chart(document.getElementById(canvasId), {
+    data:{labels, datasets: datasets.map((d,idx)=>({type:'line', label:d.label, data:d.data, yAxisID:d.axis, borderColor:seriesColor(idx), backgroundColor:seriesColor(idx), borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15}))},
+    options:{
+      responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+      plugins:{ legend:{position:'top', labels:{color:primary}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+': '+(datasets[c.datasetIndex].money ? fmtBRL.format(c.parsed.y) : fmtInt.format(c.parsed.y))}} },
+      scales:{
+        x:{grid:{display:false}, ticks:{color:muted, maxRotation:0, autoSkip:true}},
+        y:{position:'left', grid:{color:grid}, ticks:{color:muted}},
+        y1:{position:'right', grid:{display:false}, ticks:{color:muted, callback:v=> datasets.find(d=>d.axis==='y1' && d.money) ? fmtBRL.format(v) : fmtInt.format(v)}},
+      }
+    }
+  });
+}
+
+/* ---- visao geral ---- */
+let granSeo = 'day';
+seg('seg-gran-seo', v=>{granSeo=v; renderSeoGeral();});
+
+const SEO_MARCA_COLUMNS = [
+  {key:'nome', label:'Segmento', type:'text', format:r=>r.nome, sortValue:r=>r.nome},
+  {key:'clicks', label:'Cliques', type:'number', format:r=>fmtInt.format(r.clicks), sortValue:r=>r.clicks},
+  {key:'share', label:'% dos cliques', type:'number', format:r=>fmtPctPlain(r.share), sortValue:r=>r.share},
+  {key:'delta', label:'Variação de cliques', type:'number', format:r=> r.delta==null ? '—' : fmtPct(r.delta), sortValue:r=>r.delta==null?-999:r.delta},
+  {key:'impr', label:'Impressões', type:'number', format:r=>fmtInt.format(r.impr), sortValue:r=>r.impr},
+  {key:'ctr', label:'CTR', type:'number', format:r=>fmtPctPlain(r.ctr), sortValue:r=>r.ctr},
+  {key:'pos', label:'Posição média', type:'number', format:r=>fmtPos(r.pos), sortValue:r=>r.pos},
+];
+
+function seoSemMarca(total, marca){
+  const impr = total.impr - marca.impr, clicks = total.clicks - marca.clicks;
+  const pos = impr>0 ? (total.pos*total.impr - marca.pos*marca.impr)/impr : 0;
+  return {clicks, impr, ctr: impr>0 ? clicks/impr*100 : 0, pos};
+}
+
+function renderSeoGeral(){
+  if(!seoHasData) return;
+  const start = seoStartInput.value, end = seoEndInput.value;
+  if(!start || !end) return;
+  const [ps, pe] = seoPrevRange(start, end);
+
+  const g = seoGscAgg(start, end, 'total'), gp = seoGscAgg(ps, pe, 'total');
+  const gm = seoGscAgg(start, end, 'marca'), gmp = seoGscAgg(ps, pe, 'marca');
+  document.getElementById('seo-gsc-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Cliques no Google</p><p class="value">${fmtInt.format(g.clicks)}</p>${crmDeltaHTML(g.clicks, gp.clicks)}</div>
+    <div class="kpi"><p class="label">Impressões</p><p class="value">${fmtInt.format(g.impr)}</p>${crmDeltaHTML(g.impr, gp.impr)}</div>
+    <div class="kpi"><p class="label">CTR</p><p class="value">${fmtPctPlain(g.ctr)}</p>${crmDeltaHTML(g.ctr, gp.ctr)}</div>
+    <div class="kpi"><p class="label">Posição média</p><p class="value">${fmtPos(g.pos)}</p>${seoPosDeltaHTML(g.pos, gp.pos)}</div>
+  `;
+  const a = seoGa4Agg(start, end), ap = seoGa4Agg(ps, pe);
+  document.getElementById('seo-ga4-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Sessões orgânicas</p><p class="value">${fmtInt.format(a.sessions)}</p>${crmDeltaHTML(a.sessions, ap.sessions)}</div>
+    <div class="kpi"><p class="label">Pedidos</p><p class="value">${fmtInt.format(a.orders)}</p>${crmDeltaHTML(a.orders, ap.orders)}</div>
+    <div class="kpi"><p class="label">Receita</p><p class="value">${fmtBRL.format(a.revenue)}</p>${crmDeltaHTML(a.revenue, ap.revenue)}</div>
+    <div class="kpi"><p class="label">Taxa de conversão</p><p class="value">${fmtPctPlain(a.conv)}</p>${crmDeltaHTML(a.conv, ap.conv)}</div>
+  `;
+  document.getElementById('seo-compare-hint').textContent = comparePeriodText(start, end);
+
+  const gs = seoGscSeries(start, end, granSeo);
+  seoLineChart('gsc', 'chart-seo-gsc', gs.map(r=>r[0]), [
+    {label:'Cliques', data:gs.map(r=>r[1].c), axis:'y'},
+    {label:'Impressões', data:gs.map(r=>r[1].i), axis:'y1'},
+  ]);
+  const as = seoGa4Series(start, end, granSeo);
+  seoLineChart('ga4', 'chart-seo-ga4', as.map(r=>r[0]), [
+    {label:'Sessões', data:as.map(r=>r[1].s), axis:'y'},
+    {label:'Receita', data:as.map(r=>Math.round(r[1].rev*100)/100), axis:'y1', money:true},
+  ]);
+
+  const sm = seoSemMarca(g, gm), smp = seoSemMarca(gp, gmp);
+  const tot = g.clicks || 1;
+  const dl = (c, p) => p>0 ? (c-p)/p*100 : null;
+  const rows = [
+    {nome:'Marca', ...gm, share: gm.clicks/tot*100, delta: dl(gm.clicks, gmp.clicks)},
+    {nome:'Sem marca', ...sm, share: sm.clicks/tot*100, delta: dl(sm.clicks, smp.clicks)},
+    {nome:'Total', ...g, share: g.clicks>0?100:0, delta: dl(g.clicks, gp.clicks)},
+  ];
+  renderSortableTable('table-seo-marca', SEO_MARCA_COLUMNS, rows, 'Sem dados no período.');
+}
+attachSort('table-seo-marca', renderSeoGeral);
+
+/* ---- consultas ---- */
+function seoQueryAgg(start, end){
+  const m = new Map();
+  for(const r of seoGscConsultas){
+    if(r[0]<start || r[0]>end) continue;
+    let b = m.get(r[1]);
+    if(!b){ b = {c:0, i:0, pw:0}; m.set(r[1], b); }
+    b.c += r[2]; b.i += r[3]; b.pw += r[4]*r[3];
+  }
+  return m;
+}
+const SEO_CONSULTA_COLUMNS = [
+  {key:'consulta', label:'Consulta', type:'text', cellClass:'', format:r=>seoEsc(r.consulta), sortValue:r=>r.consulta},
+  {key:'tipo', label:'Tipo', type:'text', cellClass:'', format:r=>r.marca?'Marca':'Sem marca', sortValue:r=>r.marca?'Marca':'Sem marca'},
+  {key:'clicks', label:'Cliques', type:'number', format:r=>fmtInt.format(r.clicks), sortValue:r=>r.clicks},
+  {key:'delta', label:'Δ cliques', type:'number', format:r=>{ const d=r.clicks-r.prevClicks; return d>0?`<span style="color:var(--good)">+${d}</span>`:(d<0?`<span style="color:var(--crit)">${d}</span>`:'0'); }, sortValue:r=>r.clicks-r.prevClicks},
+  {key:'impr', label:'Impressões', type:'number', format:r=>fmtInt.format(r.impr), sortValue:r=>r.impr},
+  {key:'ctr', label:'CTR', type:'number', format:r=>fmtPctPlain(r.ctr), sortValue:r=>r.ctr},
+  {key:'pos', label:'Posição', type:'number', format:r=>fmtPos(r.pos), sortValue:r=>r.pos},
+];
+const SEO_OPORT_COLUMNS = SEO_CONSULTA_COLUMNS.filter(c=>c.key!=='tipo');
+
+function renderSeoConsultas(){
+  if(!seoHasData || !seoqStartInput) return;
+  const start = seoqStartInput.value, end = seoqEndInput.value;
+  if(!start || !end) return;
+  const [ps, pe] = seoPrevRange(start, end);
+  const cur = seoQueryAgg(start, end), prev = seoQueryAgg(ps, pe);
+  const tipo = document.getElementById('seoq-tipo').value;
+  const texto = (document.getElementById('seoq-texto').value || '').trim().toLowerCase();
+
+  const todas = [];
+  cur.forEach((b, idx)=>{
+    const q = seoConsultasLista[idx];
+    const pv = prev.get(idx);
+    todas.push({consulta:q, marca:seoIsMarca(q), clicks:b.c, impr:b.i, ctr: b.i>0?b.c/b.i*100:0, pos: b.i>0?b.pw/b.i:0, prevClicks: pv?pv.c:0});
+  });
+  let sem = {clicks:0, impr:0}, mar = {clicks:0, impr:0}, semPrev = 0;
+  todas.forEach(r=>{ const t = r.marca?mar:sem; t.clicks += r.clicks; t.impr += r.impr; if(!r.marca) semPrev += r.prevClicks; });
+  document.getElementById('seoq-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Consultas com impressão</p><p class="value">${fmtInt.format(todas.length)}</p><span class="delta flat">distintas no período</span></div>
+    <div class="kpi"><p class="label">Cliques sem marca</p><p class="value">${fmtInt.format(sem.clicks)}</p>${crmDeltaHTML(sem.clicks, semPrev)}</div>
+    <div class="kpi"><p class="label">Impressões sem marca</p><p class="value">${fmtInt.format(sem.impr)}</p><span class="delta flat">demanda ainda não conquistada</span></div>
+    <div class="kpi"><p class="label">Cliques de marca</p><p class="value">${fmtInt.format(mar.clicks)}</p><span class="delta flat">${fmtPctPlain(mar.clicks+sem.clicks>0 ? mar.clicks/(mar.clicks+sem.clicks)*100 : 0)} dos cliques com consulta visível</span></div>
+  `;
+  document.getElementById('seoq-compare-hint').textContent = comparePeriodText(start, end);
+
+  const passaTexto = r => !texto || r.consulta.toLowerCase().includes(texto);
+  const oport = todas.filter(r=> !r.marca && r.pos>=4 && r.pos<=20 && r.impr>=20 && passaTexto(r))
+    .sort((a,b)=> b.impr - a.impr).slice(0, 80);
+  renderSortableTable('table-seo-oport', SEO_OPORT_COLUMNS, oport, 'Nenhuma consulta entre as posições 4 e 20 com impressões suficientes.');
+
+  const filtradas = todas.filter(r=> passaTexto(r) && (tipo==='all' || (tipo==='marca') === r.marca))
+    .sort((a,b)=> b.impr - a.impr);
+  const CAP = 1500;
+  const cliquesVisiveis = mar.clicks + sem.clicks;
+  const cliquesTotais = seoGscAgg(start, end, 'total').clicks;
+  const cobertura = cliquesTotais>0 ? cliquesVisiveis/cliquesTotais*100 : 0;
+  document.getElementById('seoq-nota').textContent =
+    (filtradas.length>CAP ? `Mostrando as ${fmtInt.format(CAP)} maiores por impressões, de ${fmtInt.format(filtradas.length)} consultas. ` : `${fmtInt.format(filtradas.length)} consultas. `) +
+    `O Google oculta consultas raras: as consultas visíveis somam ${fmtInt.format(cliquesVisiveis)} dos ${fmtInt.format(cliquesTotais)} cliques do período (${fmtPctPlain(cobertura)}).`;
+  renderSortableTable('table-seo-consultas', SEO_CONSULTA_COLUMNS, filtradas.slice(0, CAP), 'Nenhuma consulta com o filtro atual.');
+}
+attachSort('table-seo-oport', renderSeoConsultas);
+attachSort('table-seo-consultas', renderSeoConsultas);
+
+/* ---- paginas ---- */
+function seoPageTipo(path){
+  if(path==='/') return 'Home';
+  if(path.startsWith('/produto/')) return 'Produto';
+  if(path.startsWith('/p/')) return 'Institucional';
+  if(/^\/[^\/]+$/.test(path)) return 'Categoria';
+  return 'Outro';
+}
+function seoPagesAgg(start, end){
+  const m = new Map();
+  const get = idx => { let b = m.get(idx); if(!b){ b = {c:0, i:0, pw:0, s:0, o:0, rev:0}; m.set(idx, b); } return b; };
+  for(const r of seoGscPaginas){ if(r[0]<start || r[0]>end) continue; const b = get(r[1]); b.c += r[2]; b.i += r[3]; b.pw += r[4]*r[3]; }
+  for(const r of seoGa4Paginas){ if(r[0]<start || r[0]>end) continue; const b = get(r[1]); b.s += r[2]; b.o += r[3]; b.rev += r[4]; }
+  const rows = [];
+  m.forEach((b, idx)=>{
+    const path = seoPaginasLista[idx];
+    if(path==='(not set)') return;
+    const tipo = seoPageTipo(path);
+    let produto = null, tag = null;
+    if(tipo==='Produto'){ const mm = path.match(/-(\d+)$/); if(mm) produto = seoProdutos[mm[1]] || null; }
+    if(tipo==='Categoria') tag = seoTags[path.slice(1)] || null;
+    rows.push({path, tipo, produto, tag, clicks:b.c, impr:b.i, ctr: b.i>0?b.c/b.i*100:0, pos: b.i>0?b.pw/b.i:0, sessoes:b.s, pedidos:b.o, receita:b.rev});
+  });
+  return rows;
+}
+const SEO_PAGINA_COLUMNS = [
+  {key:'path', label:'Página', type:'text', cellClass:'', format:r=> seoEsc(r.path) + (r.produto ? `<br><span class="hint">${seoEsc(r.produto[1])}</span>` : ''), sortValue:r=>r.path},
+  {key:'tipo', label:'Tipo', type:'text', cellClass:'', format:r=>r.tipo, sortValue:r=>r.tipo},
+  {key:'clicks', label:'Cliques', type:'number', format:r=>fmtInt.format(r.clicks), sortValue:r=>r.clicks},
+  {key:'impr', label:'Impressões', type:'number', format:r=>fmtInt.format(r.impr), sortValue:r=>r.impr},
+  {key:'ctr', label:'CTR', type:'number', format:r=>r.impr>0?fmtPctPlain(r.ctr):'—', sortValue:r=>r.ctr},
+  {key:'pos', label:'Posição', type:'number', format:r=>fmtPos(r.pos), sortValue:r=>r.pos},
+  {key:'sessoes', label:'Sessões orgânicas', type:'number', format:r=>fmtInt.format(r.sessoes), sortValue:r=>r.sessoes},
+  {key:'pedidos', label:'Pedidos', type:'number', format:r=>fmtInt.format(r.pedidos), sortValue:r=>r.pedidos},
+  {key:'receita', label:'Receita', type:'number', format:r=>fmtBRL.format(r.receita), sortValue:r=>r.receita},
+  {key:'estoque', label:'Estoque', type:'number', format:r=>{ if(!r.produto) return '—'; return r.produto[2]===0 ? '<span style="color:var(--crit); font-weight:600;">sem estoque</span>' : fmtInt.format(r.produto[2]); }, sortValue:r=>r.produto?r.produto[2]:-1},
+];
+
+function renderSeoPaginas(){
+  if(!seoHasData || !seopStartInput) return;
+  const start = seopStartInput.value, end = seopEndInput.value;
+  if(!start || !end) return;
+  const tipo = document.getElementById('seop-tipo').value;
+  const texto = (document.getElementById('seop-texto').value || '').trim().toLowerCase();
+  const todas = seoPagesAgg(start, end);
+  const semEstoque = todas.filter(r=> r.produto && r.produto[4]===1 && r.produto[2]===0 && r.impr>0);
+  const totC = todas.reduce((s,r)=>s+r.clicks,0), totRev = todas.reduce((s,r)=>s+r.receita,0);
+  document.getElementById('seop-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Páginas com impressão</p><p class="value">${fmtInt.format(todas.filter(r=>r.impr>0).length)}</p><span class="delta flat">no período</span></div>
+    <div class="kpi"><p class="label">Cliques nas páginas</p><p class="value">${fmtInt.format(totC)}</p><span class="delta flat">soma do Google</span></div>
+    <div class="kpi"><p class="label">Receita orgânica por página de entrada</p><p class="value">${fmtBRL.format(totRev)}</p><span class="delta flat">GA4</span></div>
+    <div class="kpi"><p class="label">Produtos com impressão e sem estoque</p><p class="value">${fmtInt.format(semEstoque.length)}</p><span class="delta ${semEstoque.length>0?'down':'flat'}">${fmtInt.format(semEstoque.reduce((s,r)=>s+r.impr,0))} impressões</span></div>
+  `;
+  document.getElementById('seop-compare-hint').textContent = comparePeriodText(start, end);
+  const filtradas = todas.filter(r=> (tipo==='all' || r.tipo===tipo) && (!texto || r.path.toLowerCase().includes(texto) || (r.produto && r.produto[1].toLowerCase().includes(texto))))
+    .sort((a,b)=> b.clicks - a.clicks || b.impr - a.impr).slice(0, 1500);
+  renderSortableTable('table-seo-paginas', SEO_PAGINA_COLUMNS, filtradas, 'Nenhuma página com o filtro atual.');
+}
+attachSort('table-seo-paginas', renderSeoPaginas);
+
+/* ---- catalogo e indexacao ---- */
+const SEO_SITEMAP_COLUMNS = [
+  {key:'caminho', label:'Sitemap', type:'text', cellClass:'', format:r=>seoEsc(r.caminho), sortValue:r=>r.caminho},
+  {key:'tipo', label:'Conteúdo', type:'text', cellClass:'', format:r=>r.tipo==='image'?'Imagens':(r.tipo==='web'?'Páginas':seoEsc(r.tipo)), sortValue:r=>r.tipo},
+  {key:'enviadas', label:'Enviadas', type:'number', format:r=>fmtInt.format(r.enviadas), sortValue:r=>r.enviadas},
+  {key:'indexadas', label:'Indexadas', type:'number', format:r=> r.indexadas===0 && r.enviadas>0 ? `<span style="color:var(--crit); font-weight:600;">0</span>` : fmtInt.format(r.indexadas), sortValue:r=>r.indexadas},
+  {key:'erros', label:'Erros', type:'number', format:r=>fmtInt.format(r.erros), sortValue:r=>r.erros},
+  {key:'avisos', label:'Avisos', type:'number', format:r=>fmtInt.format(r.avisos), sortValue:r=>r.avisos},
+  {key:'baixado', label:'Última leitura do Google', type:'text', cellClass:'num', format:r=>r.baixado||'—', sortValue:r=>r.baixado},
+];
+const SEO_SEMESTOQUE_COLUMNS = [
+  {key:'nome', label:'Produto', type:'text', cellClass:'', format:r=>seoEsc(r.produto[1]) + `<br><span class="hint">${seoEsc(r.produto[0])}</span>`, sortValue:r=>r.produto[1]},
+  {key:'impr', label:'Impressões', type:'number', format:r=>fmtInt.format(r.impr), sortValue:r=>r.impr},
+  {key:'clicks', label:'Cliques', type:'number', format:r=>fmtInt.format(r.clicks), sortValue:r=>r.clicks},
+  {key:'pos', label:'Posição', type:'number', format:r=>fmtPos(r.pos), sortValue:r=>r.pos},
+];
+function seoTextoStatus(len){
+  if(len===0) return '<span style="color:var(--crit); font-weight:600;">vazia</span>';
+  if(len<150) return '<span style="color:var(--warn); font-weight:600;">curto</span>';
+  return 'ok';
+}
+const SEO_CATEGORIA_COLUMNS = [
+  {key:'path', label:'Página', type:'text', cellClass:'', format:r=>seoEsc(r.path), sortValue:r=>r.path},
+  {key:'titulo', label:'Título cadastrado', type:'text', cellClass:'', format:r=> r.tag[0] ? seoEsc(r.tag[0]) + ` <span class="hint">(${r.tag[0].length})</span>` : '<span style="color:var(--crit); font-weight:600;">sem título</span>', sortValue:r=>r.tag[0]},
+  {key:'texto', label:'Descrição da tag na VNDA', type:'number', format:r=>`${seoTextoStatus(r.tag[1])} <span class="hint">${fmtInt.format(r.tag[1])} car.</span>`, sortValue:r=>r.tag[1]},
+  {key:'impr', label:'Impressões', type:'number', format:r=>fmtInt.format(r.impr), sortValue:r=>r.impr},
+  {key:'clicks', label:'Cliques', type:'number', format:r=>fmtInt.format(r.clicks), sortValue:r=>r.clicks},
+  {key:'pos', label:'Posição', type:'number', format:r=>fmtPos(r.pos), sortValue:r=>r.pos},
+];
+
+function renderSeoCatalogo(){
+  if(!seoHasData || !seoTabMax) return;
+  const paginas = seoPagesAgg(seoTabMin, seoTabMax);
+  const prods = Object.values(seoProdutos).filter(p=>p[4]===1);
+  const semEstoque = paginas.filter(r=> r.produto && r.produto[4]===1 && r.produto[2]===0 && r.impr>0);
+  const catsSemTexto = paginas.filter(r=> r.tag && r.impr>0 && r.tag[1]===0);
+  const descCurta = prods.filter(p=>p[3]<150);
+  const sitemapRows = [];
+  seoSitemaps.forEach(s=> (s.conteudo||[]).forEach(c=> sitemapRows.push({caminho:s.caminho, tipo:c.tipo, enviadas:c.enviadas, indexadas:c.indexadas, erros:s.erros, avisos:s.avisos, baixado:s.baixado_em})));
+  const imgSemIndex = sitemapRows.filter(r=>r.tipo==='image' && r.indexadas===0 && r.enviadas>0).reduce((s,r)=>s+r.enviadas,0);
+  document.getElementById('seoc-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Produtos ativos</p><p class="value">${fmtInt.format(prods.length)}</p><span class="delta ${descCurta.length>0?'down':'flat'}">${fmtInt.format(descCurta.length)} com descrição curta ou vazia</span></div>
+    <div class="kpi"><p class="label">Produtos com impressão e sem estoque</p><p class="value">${fmtInt.format(semEstoque.length)}</p><span class="delta ${semEstoque.length>0?'down':'flat'}">${fmtInt.format(semEstoque.reduce((s,r)=>s+r.impr,0))} impressões em 90 dias</span></div>
+    <div class="kpi"><p class="label">Categorias com descrição vazia</p><p class="value">${fmtInt.format(catsSemTexto.length)}</p><span class="delta ${catsSemTexto.length>0?'down':'flat'}">na tag, com impressões no Google</span></div>
+    <div class="kpi"><p class="label">Imagens do sitemap sem indexar</p><p class="value">${fmtInt.format(imgSemIndex)}</p><span class="delta ${imgSemIndex>0?'down':'flat'}">enviadas e com 0 indexadas</span></div>
+  `;
+  renderSortableTable('table-seo-sitemap', SEO_SITEMAP_COLUMNS, sitemapRows, 'Nenhum sitemap enviado ao Search Console.');
+  renderSortableTable('table-seo-semestoque', SEO_SEMESTOQUE_COLUMNS, semEstoque.sort((a,b)=>b.impr-a.impr), 'Nenhum produto sem estoque aparece no Google.');
+  const cats = paginas.filter(r=> r.tag && r.impr>0).sort((a,b)=>b.impr-a.impr);
+  renderSortableTable('table-seo-categorias', SEO_CATEGORIA_COLUMNS, cats, 'Nenhuma página de categoria com impressões.');
+}
+attachSort('table-seo-sitemap', renderSeoCatalogo);
+attachSort('table-seo-semestoque', renderSeoCatalogo);
+attachSort('table-seo-categorias', renderSeoCatalogo);
+
+function renderSeoAll(){
+  safeRun(renderSeoGeral, 'SEO: visão geral');
+  safeRun(renderSeoConsultas, 'SEO: consultas');
+  safeRun(renderSeoPaginas, 'SEO: páginas');
+  safeRun(renderSeoCatalogo, 'SEO: catálogo');
+}
+if(seoHasData){
+  [seoStartInput, seoEndInput].forEach(el=>el.addEventListener('change', renderSeoGeral));
+  if(seoqStartInput){
+    [seoqStartInput, seoqEndInput, document.getElementById('seoq-tipo')].forEach(el=>el.addEventListener('change', renderSeoConsultas));
+    document.getElementById('seoq-texto').addEventListener('input', renderSeoConsultas);
+    [seopStartInput, seopEndInput, document.getElementById('seop-tipo')].forEach(el=>el.addEventListener('change', renderSeoPaginas));
+    document.getElementById('seop-texto').addEventListener('input', renderSeoPaginas);
+  }
+  renderSeoAll();
 }
 
 /* ---------------- TOP TAB: CRM > AUTOMAÇÕES ---------------- */
