@@ -1183,6 +1183,7 @@ tbody tr:last-child td{border-bottom:none;}
     <button class="tabbtn" id="seobtn-consultas" role="tab" aria-selected="false" onclick="switchSeoSub('consultas')">Consultas</button>
     <button class="tabbtn" id="seobtn-paginas" role="tab" aria-selected="false" onclick="switchSeoSub('paginas')">Páginas</button>
     <button class="tabbtn" id="seobtn-catalogo" role="tab" aria-selected="false" onclick="switchSeoSub('catalogo')">Catálogo e indexação</button>
+    <button class="tabbtn" id="seobtn-mercado" role="tab" aria-selected="false" onclick="switchSeoSub('mercado')">Mercado</button>
   </div>
 
   <div class="subpanel active" id="seopanel-geral">
@@ -1292,6 +1293,44 @@ tbody tr:last-child td{border-bottom:none;}
     <p class="footnote" style="margin-top:-6px;">Título e descrição vêm do cadastro da tag na VNDA. O texto de SEO da página também pode estar em banners da VNDA, que não são lidos aqui: confira a página antes de agir.</p>
     <div class="tablewrap maxh"><table id="table-seo-categorias"><thead></thead><tbody></tbody></table></div>
   </div>
+
+  <div class="subpanel" id="seopanel-mercado">
+    <div class="card">
+      <div class="filterbar">
+        <div class="field">
+          <label for="seom-texto">Buscar palavra</label>
+          <input type="text" id="seom-texto" placeholder="ex: alpargata">
+        </div>
+        <div class="field">
+          <label for="seom-pos">Posição</label>
+          <select id="seom-pos"><option value="all">Todas</option><option value="3">Top 3</option><option value="10">Top 10</option><option value="20">Top 20</option><option value="21">Acima de 20</option></select>
+        </div>
+        <span class="hint" id="seom-hint"></span>
+      </div>
+    </div>
+    <p class="footnote" id="seom-nota" style="margin-top:-6px;"></p>
+    <div class="kpirow" id="seom-kpirow"></div>
+
+    <div class="section-title">Evolução mensal estimada</div>
+    <p class="footnote" style="margin-top:-6px;">Palavras em que o domínio aparece no Google e tráfego mensal estimado a partir delas. São estimativas do DataForSEO, diferentes dos cliques reais do Search Console.</p>
+    <div class="chartwrap" style="height:260px;"><canvas id="chart-seo-mercado" role="img" aria-label="Palavras ranqueadas e tráfego estimado por mês"></canvas></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Distribuição das posições</div>
+    <div class="tablewrap"><table id="table-seo-posicoes"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Palavras que mais trazem tráfego</div>
+    <p class="footnote" id="seom-palavras-nota" style="margin-top:-6px;"></p>
+    <div class="tablewrap maxh"><table id="table-seo-palavras"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Concorrentes nas mesmas buscas</div>
+    <p class="footnote" style="margin-top:-6px;">Domínios que aparecem nas mesmas palavras. O tráfego é o estimado só nas palavras em comum, para comparar a Perky com cada um nesse terreno.</p>
+    <div class="tablewrap"><table id="table-seo-concorrentes"><thead></thead><tbody></tbody></table></div>
+
+    <div class="section-title" style="margin-top:1.75rem;">Links que apontam para o site</div>
+    <p class="footnote" id="seom-links-nota" style="margin-top:-6px;"></p>
+    <div class="tablewrap"><table id="table-seo-ancoras"><thead></thead><tbody></tbody></table></div>
+    <div class="tablewrap" style="margin-top:12px;"><table id="table-seo-dominios-ref"><thead></thead><tbody></tbody></table></div>
+  </div>
 </div>
 
 <script>
@@ -1363,7 +1402,7 @@ function switchVendasSub(name){
 }
 
 function switchSeoSub(name){
-  ['geral','consultas','paginas','catalogo'].forEach(n=>{
+  ['geral','consultas','paginas','catalogo','mercado'].forEach(n=>{
     document.getElementById('seopanel-'+n).classList.toggle('active', n===name);
     document.getElementById('seobtn-'+n).setAttribute('aria-selected', n===name);
   });
@@ -1386,7 +1425,7 @@ function switchCrmSub(name){
 // fora dele (local, file://) usa hash (#/crm/canal).
 const ROUTES = {
   vendas:   {slug:'vendas',   btn:'vdbtn-',  sw:switchVendasSub,    subs:{cupons:'cupons'}},
-  seo:      {slug:'seo',      btn:'seobtn-', sw:switchSeoSub,       subs:{geral:'visao-geral', consultas:'consultas', paginas:'paginas', catalogo:'catalogo'}},
+  seo:      {slug:'seo',      btn:'seobtn-', sw:switchSeoSub,       subs:{geral:'visao-geral', consultas:'consultas', paginas:'paginas', catalogo:'catalogo', mercado:'mercado'}},
   crm:      {slug:'crm',      btn:'crmbtn-', sw:switchCrmSub,       subs:{email:'canal', automacoes:'automacoes', transmissoes:'transmissoes', calendario:'calendario'}},
   produto:  {slug:'produto',  btn:'tabbtn-', sw:switchTab,          subs:{abc:'curva-abc', estoque:'estoque', desconto:'descontos', crosssell:'venda-cruzada', 'avise-me':'demanda-reprimida', reposicoes:'reposicoes', compras:'compras'}},
   deposito: {slug:'logistica',btn:'depbtn-', sw:switchDepositoSub,  subs:{prateleiras:'deposito', expedicao:'expedicao'}},
@@ -3396,11 +3435,102 @@ attachSort('table-seo-sitemap', renderSeoCatalogo);
 attachSort('table-seo-semestoque', renderSeoCatalogo);
 attachSort('table-seo-categorias', renderSeoCatalogo);
 
+
+/* ---- mercado (DataForSEO) ---- */
+const seoMercado = DATA.seo_mercado || {};
+const seoMercadoOk = !!(seoMercado.visao);
+const fmtDataBR = iso => iso ? iso.slice(8,10)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4) : '';
+const MESES_ABREV = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+
+const SEO_POSICOES_COLUMNS = [
+  {key:'faixa', label:'Faixa de posição', type:'text', cellClass:'', format:r=>r.faixa, sortValue:r=>r.ordem},
+  {key:'n', label:'Palavras', type:'number', format:r=>fmtInt.format(r.n), sortValue:r=>r.n},
+  {key:'pct', label:'% das palavras', type:'number', format:r=>fmtPctPlain(r.pct), sortValue:r=>r.pct},
+];
+const SEO_PALAVRAS_COLUMNS = [
+  {key:'kw', label:'Palavra', type:'text', cellClass:'', format:r=>seoEsc(r.kw), sortValue:r=>r.kw},
+  {key:'vol', label:'Buscas por mês', type:'number', format:r=>fmtInt.format(r.vol), sortValue:r=>r.vol},
+  {key:'pos', label:'Posição', type:'number', format:r=>fmtInt.format(r.pos), sortValue:r=>r.pos},
+  {key:'etv', label:'Tráfego estimado/mês', type:'number', format:r=>fmtInt.format(Math.round(r.etv)), sortValue:r=>r.etv},
+  {key:'url', label:'Página', type:'text', cellClass:'', format:r=>seoEsc(r.url||'/'), sortValue:r=>r.url},
+];
+const SEO_CONCORRENTES_COLUMNS = [
+  {key:'dominio', label:'Domínio', type:'text', cellClass:'', format:r=>seoEsc(r.dominio), sortValue:r=>r.dominio},
+  {key:'comuns', label:'Palavras em comum', type:'number', format:r=>fmtInt.format(r.comuns), sortValue:r=>r.comuns},
+  {key:'posConc', label:'Posição média do concorrente', type:'number', format:r=>fmtPos(r.posConc), sortValue:r=>r.posConc},
+  {key:'etvConc', label:'Tráfego estimado do concorrente nelas', type:'number', format:r=>fmtInt.format(Math.round(r.etvConc)), sortValue:r=>r.etvConc},
+  {key:'etvPerky', label:'Tráfego estimado da Perky nelas', type:'number', format:r=>`<b>${fmtInt.format(Math.round(r.etvPerky))}</b>`, sortValue:r=>r.etvPerky},
+  {key:'total', label:'Tráfego estimado total do domínio', type:'number', format:r=>fmtInt.format(r.total), sortValue:r=>r.total},
+];
+const SEO_ANCORAS_COLUMNS = [
+  {key:'ancora', label:'Texto do link (âncora)', type:'text', cellClass:'', format:r=>seoEsc(r.ancora.length>90 ? r.ancora.slice(0,90)+'…' : r.ancora), sortValue:r=>r.ancora},
+  {key:'backlinks', label:'Links', type:'number', format:r=>fmtInt.format(r.backlinks), sortValue:r=>r.backlinks},
+  {key:'dominios', label:'Domínios', type:'number', format:r=>fmtInt.format(r.dominios), sortValue:r=>r.dominios},
+  {key:'spam', label:'Pontuação de spam', type:'number', format:r=> r.spam>=40 ? `<span style="color:var(--crit); font-weight:600;">${r.spam}</span>` : `${r.spam}`, sortValue:r=>r.spam},
+];
+const SEO_DOMINIOSREF_COLUMNS = [
+  {key:'dominio', label:'Domínios de destaque que linkam', type:'text', cellClass:'', format:r=>seoEsc(r.dominio), sortValue:r=>r.dominio},
+  {key:'rank', label:'Autoridade (rank)', type:'number', format:r=>r.rank?fmtInt.format(r.rank):'—', sortValue:r=>r.rank},
+  {key:'links', label:'Links', type:'number', format:r=>fmtInt.format(r.links), sortValue:r=>r.links},
+  {key:'spam', label:'Pontuação de spam', type:'number', format:r=>r.spam==null?'—':String(r.spam), sortValue:r=>r.spam==null?-1:r.spam},
+  {key:'visto', label:'Primeira vez visto', type:'text', cellClass:'num', format:r=>fmtDataBR(r.visto), sortValue:r=>r.visto},
+];
+
+function renderSeoMercado(){
+  const kp = document.getElementById('seom-kpirow');
+  if(!seoMercadoOk){
+    kp.innerHTML = '<div class="emptystate">Ainda não há coleta do DataForSEO.</div>';
+    return;
+  }
+  const v = seoMercado.visao, b = seoMercado.backlinks || {};
+  document.getElementById('seom-hint').textContent = 'Coleta de ' + fmtDataBR(seoMercado.coletado_em);
+  document.getElementById('seom-nota').textContent = 'Dados do DataForSEO (' + (seoMercado.local||'') + ', ' + (seoMercado.idioma||'') + '), coletados em ' + fmtDataBR(seoMercado.coletado_em) + '. A atualização é manual até o login do DataForSEO ser cadastrado no workflow.';
+  const ancoras = (b.ancoras||[]);
+  const spamLinks = ancoras.filter(a=>/backlink|seo links|organic search traffic|pbn/i.test(a[0])).reduce((s,a)=>s+a[1],0);
+  const spamPct = b.total>0 ? spamLinks/b.total*100 : 0;
+  kp.innerHTML = `
+    <div class="kpi"><p class="label">Palavras em que aparece</p><p class="value">${fmtInt.format(v.count)}</p><span class="delta flat">${fmtInt.format(v.novas)} novas, ${fmtInt.format(v.perdidas)} perdidas</span></div>
+    <div class="kpi"><p class="label">Tráfego estimado por mês</p><p class="value">${fmtInt.format(Math.round(v.etv))}</p><span class="delta flat">visitas pelo Google, estimativa</span></div>
+    <div class="kpi"><p class="label">Links para o site</p><p class="value">${fmtInt.format(b.total||0)}</p><span class="delta flat">de ${fmtInt.format(b.dominios||0)} domínios</span></div>
+    <div class="kpi"><p class="label">Links de venda de SEO (spam)</p><p class="value">${fmtPctPlain(spamPct)}</p><span class="delta ${spamPct>20?'down':'flat'}">${fmtInt.format(spamLinks)} links com texto de venda de backlinks</span></div>
+  `;
+  document.getElementById('seom-links-nota').textContent =
+    `${fmtInt.format(b.total||0)} links de ${fmtInt.format(b.dominios||0)} domínios. A maior parte vem de uma rede de sites de spam que cria um link novo por dia, com texto de venda de backlinks. Esse tipo de link não ajuda no ranqueamento e pode ser tratado com a ferramenta de rejeição de links do Google.`;
+
+  const hist = seoMercado.historico || [];
+  seoLineChart('mercado', 'chart-seo-mercado', hist.map(h=> MESES_ABREV[h[1]-1] + '/' + String(h[0]).slice(2)), [
+    {label:'Tráfego estimado', data:hist.map(h=>Math.round(h[2])), axis:'y'},
+    {label:'Palavras', data:hist.map(h=>h[3]), axis:'y1'},
+  ]);
+
+  const faixas = [['Posição 1', v.pos_1, 1], ['Posições 2 a 3', v.pos_2_3, 2], ['Posições 4 a 10', v.pos_4_10, 3], ['Posições 11 a 20', v.pos_11_20, 4],
+    ['Posições 21 a 30', v.pos_21_30, 5], ['Posições 31 a 60', (v.pos_31_40||0)+(v.pos_41_50||0)+(v.pos_51_60||0), 6], ['Posições 61 a 100', (v.pos_61_70||0)+(v.pos_71_80||0)+(v.pos_81_90||0)+(v.pos_91_100||0), 7]];
+  const totalPal = faixas.reduce((s,f)=>s+f[1],0) || 1;
+  renderSortableTable('table-seo-posicoes', SEO_POSICOES_COLUMNS, faixas.map(f=>({faixa:f[0], n:f[1], pct:f[1]/totalPal*100, ordem:f[2]})), 'Sem dados.');
+
+  const texto = (document.getElementById('seom-texto').value||'').trim().toLowerCase();
+  const posSel = document.getElementById('seom-pos').value;
+  const passaPos = p => posSel==='all' || (posSel==='21' ? p>20 : p<=+posSel);
+  const palavras = (seoMercado.palavras||[]).map(r=>({kw:r[0], vol:r[1], pos:r[2], etv:r[3], url:r[4]}))
+    .filter(r=> (!texto || r.kw.toLowerCase().includes(texto)) && passaPos(r.pos)).sort((a,b)=>b.etv-a.etv);
+  document.getElementById('seom-palavras-nota').textContent = `${fmtInt.format(palavras.length)} das ${fmtInt.format(seoMercado.palavras_total||0)} palavras ranqueadas (as de maior tráfego estimado).`;
+  renderSortableTable('table-seo-palavras', SEO_PALAVRAS_COLUMNS, palavras, 'Nenhuma palavra com o filtro atual.');
+
+  renderSortableTable('table-seo-concorrentes', SEO_CONCORRENTES_COLUMNS,
+    (seoMercado.concorrentes||[]).map(c=>({dominio:c[0], comuns:c[1], posConc:c[2], etvConc:c[3], etvPerky:c[4], total:c[5]})), 'Sem concorrentes na coleta.');
+  renderSortableTable('table-seo-ancoras', SEO_ANCORAS_COLUMNS, ancoras.map(a=>({ancora:a[0], backlinks:a[1], dominios:a[2], spam:a[3]})), 'Sem dados de links.');
+  renderSortableTable('table-seo-dominios-ref', SEO_DOMINIOSREF_COLUMNS, (b.dominios_ref || b.dominios_lista || []).map(d=>({dominio:d[0], rank:d[1], links:d[2], spam:d[3], visto:d[4]})), 'Sem dados de domínios.');
+}
+['table-seo-posicoes','table-seo-palavras','table-seo-concorrentes','table-seo-ancoras','table-seo-dominios-ref'].forEach(id=>attachSort(id, renderSeoMercado));
+document.getElementById('seom-texto').addEventListener('input', renderSeoMercado);
+document.getElementById('seom-pos').addEventListener('change', renderSeoMercado);
+
 function renderSeoAll(){
   safeRun(renderSeoGeral, 'SEO: visão geral');
   safeRun(renderSeoConsultas, 'SEO: consultas');
   safeRun(renderSeoPaginas, 'SEO: páginas');
   safeRun(renderSeoCatalogo, 'SEO: catálogo');
+  safeRun(renderSeoMercado, 'SEO: mercado');
 }
 if(seoHasData){
   [seoStartInput, seoEndInput].forEach(el=>el.addEventListener('change', renderSeoGeral));
