@@ -308,6 +308,21 @@ tbody tr:last-child td{border-bottom:none;}
 .emptystate{padding:2rem; text-align:center; color:var(--text-muted); font-size:13px;}
 .footnote{font-size:11px; color:var(--text-muted); margin-top:1rem;}
 
+.cro-funnel{display:flex; flex-direction:column; gap:10px; margin-bottom:1rem;}
+.cro-step{display:grid; grid-template-columns:190px 1fr 120px 150px; gap:14px; align-items:center;}
+.cro-step .lbl{font-size:13px; font-weight:600;}
+.cro-bar{height:28px; background:var(--accent-bg); border-radius:6px; overflow:hidden;}
+.cro-bar>span{display:block; height:100%; background:var(--accent); border-radius:6px; min-width:2px;}
+.cro-step .val{text-align:right; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums;}
+.cro-step .nxt{font-size:12px; color:var(--text-secondary); font-variant-numeric:tabular-nums;}
+.cro-sub{font-size:11px; font-weight:400; margin-top:1px;}
+.cro-sub .delta{font-size:11px;}
+.cro-tams{display:flex; gap:3px; flex-wrap:wrap;}
+.cro-tam{font-size:11px; font-weight:600; padding:1px 6px; border-radius:4px; font-variant-numeric:tabular-nums;}
+.cro-tam.ok{background:var(--good-bg); color:var(--good-ink);}
+.cro-tam.no{background:var(--crit-bg); color:var(--crit-ink); text-decoration:line-through;}
+@media (max-width:720px){ .cro-step{grid-template-columns:1fr 1fr;} .cro-bar{grid-column:1/-1; order:3;} }
+
 .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:1.25rem;}
 .cal-dow{font-size:11px; color:var(--text-muted); text-align:center; padding:4px 0; text-transform:uppercase; letter-spacing:.04em;}
 .cal-cell{min-height:92px; border:1px solid var(--border); border-radius:var(--radius); padding:6px; background:transparent;}
@@ -334,6 +349,7 @@ tbody tr:last-child td{border-bottom:none;}
 
 <div class="dr-popup" id="dr-popup">
   <div class="dr-presets">
+    <button type="button" data-preset="1d">Ontem</button>
     <button type="button" data-preset="month">Esse mês</button>
     <button type="button" data-preset="7d">Últimos 7 dias</button>
     <button type="button" data-preset="30d">Últimos 30 dias</button>
@@ -385,6 +401,7 @@ tbody tr:last-child td{border-bottom:none;}
   <button class="tabbtn" id="topbtn-vendas" role="tab" aria-selected="true" onclick="switchTopTab('vendas')">Vendas</button>
   <button class="tabbtn" id="topbtn-crm" role="tab" aria-selected="false" onclick="switchTopTab('crm')">CRM</button>
   <button class="tabbtn" id="topbtn-seo" role="tab" aria-selected="false" onclick="switchTopTab('seo')">SEO</button>
+  <button class="tabbtn" id="topbtn-cro" role="tab" aria-selected="false" onclick="switchTopTab('cro')">CRO</button>
   <button class="tabbtn" id="topbtn-produto" role="tab" aria-selected="false" onclick="switchTopTab('produto')">Produto</button>
   <button class="tabbtn" id="topbtn-deposito" role="tab" aria-selected="false" onclick="switchTopTab('deposito')">Logística</button>
   <button class="tabbtn" id="topbtn-padroes" role="tab" aria-selected="false" onclick="switchTopTab('padroes')">Padrões</button>
@@ -1176,6 +1193,118 @@ tbody tr:last-child td{border-bottom:none;}
   </div>
 </div>
 
+<!-- ================= TOP TAB: CRO ================= -->
+<div class="panel" id="toppanel-cro">
+  <div class="tabbar sub" role="tablist">
+    <button class="tabbtn" id="crobtn-funil" role="tab" aria-selected="true" onclick="switchCroSub('funil')">Funil</button>
+    <button class="tabbtn" id="crobtn-categorias" role="tab" aria-selected="false" onclick="switchCroSub('categorias')">Categorias</button>
+    <button class="tabbtn" id="crobtn-produtos" role="tab" aria-selected="false" onclick="switchCroSub('produtos')">Produtos</button>
+    <button class="tabbtn" id="crobtn-checkout" role="tab" aria-selected="false" onclick="switchCroSub('checkout')">Checkout</button>
+    <button class="tabbtn" id="crobtn-conferencia" role="tab" aria-selected="false" onclick="switchCroSub('conferencia')">Conferência GA4 x VNDA</button>
+  </div>
+
+  <div class="card">
+    <div class="filterbar">
+      <div class="field">
+        <label>Período</label>
+        <button type="button" class="dr-trigger" id="cro-daterange-btn"></button>
+        <input type="date" id="cro-start" style="display:none;">
+        <input type="date" id="cro-end" style="display:none;">
+      </div>
+      <div class="field">
+        <label>Atalhos</label>
+        <div class="seg" id="seg-cro-atalho">
+          <button aria-pressed="false" data-v="1">Ontem</button>
+          <button aria-pressed="true" data-v="7">7 dias</button>
+          <button aria-pressed="false" data-v="30">30 dias</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="cro-dispositivo">Dispositivo</label>
+        <select id="cro-dispositivo"></select>
+      </div>
+      <div class="field">
+        <label for="cro-canal">Canal</label>
+        <select id="cro-canal"></select>
+      </div>
+      <span class="hint" id="cro-compare-hint"></span>
+    </div>
+    <p class="footnote" id="cro-notice" style="margin:10px 0 0;"></p>
+  </div>
+
+  <div class="subpanel active" id="cropanel-funil">
+    <div class="kpirow" id="cro-kpirow"></div>
+
+    <div class="section-title">Funil principal, em sessões</div>
+    <p class="footnote" style="margin-top:-6px;">Cada etapa conta sessões que tiveram o evento ou a página. O percentual ao lado mostra quantas seguiram para a etapa seguinte, e a seta compara com o período anterior. O checkout não é estritamente linear: quem usa endereço salvo ou retirada na loja pula o Frete, então Pagamento pode superar Frete.</p>
+    <div class="cro-funnel" id="cro-funil-steps"></div>
+
+    <div class="section-title" style="margin-top:1.5rem;">Sessões e conversão por dia</div>
+    <div class="chartwrap" style="height:260px;"><canvas id="chart-cro-dia" role="img" aria-label="Sessões e taxa de conversão por dia"></canvas></div>
+
+    <div class="section-title" style="margin-top:1.5rem;">Porta de entrada</div>
+    <p class="footnote" style="margin-top:-6px;">Tipo da primeira página da sessão (landingPage). Fica fora do funil linear porque a maior parte das sessões já entra direto numa página de produto. Categoria segue o detalhamento da aba Categorias; Outras reúne busca, conta, institucionais e o restante.</p>
+    <div class="tablewrap"><table id="table-cro-entrada"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="cropanel-categorias">
+    <div class="controls-row">
+      <div class="field" style="min-width:220px;">
+        <label for="cro-cat-texto">Buscar página</label>
+        <input type="text" id="cro-cat-texto" placeholder="ex: bazar">
+      </div>
+    </div>
+    <p class="footnote" style="margin-top:0;">Sessões que começaram na página de categoria e o que fizeram depois: viram um produto, adicionaram ao carrinho, compraram. Categoria = página que corresponde a uma tag ou menu da VNDA (fora a home, produtos, checkout, busca, conta, entrar e /p/*). Cada coluna mostra a variação contra o período anterior.</p>
+    <div class="tablewrap maxh" style="max-height:640px;"><table id="table-cro-categorias"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="cropanel-produtos">
+    <div class="controls-row">
+      <div class="field" style="min-width:220px;">
+        <label for="cro-prod-texto">Buscar produto ou referência</label>
+        <input type="text" id="cro-prod-texto" placeholder="ex: papete">
+      </div>
+      <div class="field">
+        <label for="cro-prod-filtro">Mostrar</label>
+        <select id="cro-prod-filtro">
+          <option value="all">Todos</option>
+          <option value="atencao">Muito vistos e pouco adicionados</option>
+          <option value="furada">Grade furada</option>
+          <option value="semestoque">Sem estoque</option>
+        </select>
+      </div>
+    </div>
+    <div class="kpirow" id="cro-prod-kpirow"></div>
+    <p class="footnote" style="margin-top:0;">Visualizações, adições ao carrinho e compras do GA4 por produto (eventos de e-commerce), cruzadas com o estoque atual por tamanho na VNDA. Esta tabela respeita o filtro de dispositivo, mas não o de canal: o GA4 não separa os eventos de item por canal sem multiplicar o tamanho dos dados. "Muito visto e pouco adicionado" = produto no quarto mais visto do período e com taxa de adição ao carrinho abaixo da metade da média. "Grade furada" = tem estoque, mas falta pelo menos um tamanho entre 34 e 39.</p>
+    <div class="tablewrap maxh" style="max-height:640px;"><table id="table-cro-produtos"><thead></thead><tbody></tbody></table></div>
+  </div>
+
+  <div class="subpanel" id="cropanel-checkout">
+    <div class="kpirow" id="cro-ck-kpirow"></div>
+    <div class="section-title">Funil do checkout, em checkouts únicos</div>
+    <p class="footnote" style="margin-top:-6px;">Cada URL de checkout traz um código próprio. Aqui as URLs são agrupadas por código e cada checkout conta uma vez, na etapa mais avançada que chegou: quem pulou uma etapa conta como tendo passado pelas anteriores.</p>
+    <div class="cro-funnel" id="cro-ck-steps"></div>
+    <p class="footnote" id="cro-ck-nota"></p>
+  </div>
+
+  <div class="subpanel" id="cropanel-conferencia">
+    <div class="kpirow" id="cro-cf-kpirow"></div>
+    <p class="footnote" style="margin-top:-6px;">Compara por dia os pedidos do GA4 (purchase, transactionId) com os pedidos confirmados da VNDA (status confirmed, data de recebimento). Cobertura = pedidos confirmados da VNDA cujo código aparece como transactionId no GA4. O GA4 também conta pedidos que depois foram cancelados, por isso a receita dele costuma ficar acima da VNDA. Se a cobertura cair, o funil acima fica errado. Os filtros de dispositivo e canal não se aplicam a esta aba.</p>
+    <div class="tablewrap maxh"><table id="table-cro-conf"><thead></thead><tbody></tbody></table></div>
+    <div class="tablesgrid two" style="margin-top:1.5rem;">
+      <div>
+        <div class="section-title" style="margin-top:0;">Pedidos confirmados que não aparecem no GA4</div>
+        <div class="tablewrap maxh"><table id="table-cro-faltam"><thead></thead><tbody></tbody></table></div>
+      </div>
+      <div>
+        <div class="section-title" style="margin-top:0;">Pedidos gerados e não confirmados</div>
+        <p class="footnote" style="margin-top:-6px;">Status diferente de confirmed na VNDA: separa quem desistiu no pagamento de quem gerou o pedido e não pagou.</p>
+        <div class="tablewrap maxh"><table id="table-cro-naopagos"><thead></thead><tbody></tbody></table></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ================= TOP TAB: SEO ================= -->
 <div class="panel" id="toppanel-seo">
   <div class="tabbar sub" role="tablist">
@@ -1353,12 +1482,13 @@ function matchCategoria(sel, referencia){
 }
 
 function switchTopTab(name){
-  ['padroes','produto','deposito','vendas','crm','seo'].forEach(n=>{
+  ['padroes','produto','deposito','vendas','crm','seo','cro'].forEach(n=>{
     document.getElementById('toppanel-'+n).classList.toggle('active', n===name);
     document.getElementById('topbtn-'+n).setAttribute('aria-selected', n===name);
   });
   if(name==='deposito'){ safeRun(renderDepositoSaudeCharts, 'gráfico do Depósito'); safeRun(renderExpedicao, 'painel de Expedição'); }
   if(name==='seo' && typeof renderSeoAll==='function'){ safeRun(renderSeoAll, 'painel de SEO'); }
+  if(name==='cro' && typeof renderCroAll==='function'){ safeRun(renderCroAll, 'painel de CRO'); }
   syncDynamicSticky();
   updateRoute();
 }
@@ -1411,6 +1541,16 @@ function switchSeoSub(name){
   if(typeof renderSeoAll==='function') safeRun(renderSeoAll, 'painel de SEO');
 }
 
+function switchCroSub(name){
+  ['funil','categorias','produtos','checkout','conferencia'].forEach(n=>{
+    document.getElementById('cropanel-'+n).classList.toggle('active', n===name);
+    document.getElementById('crobtn-'+n).setAttribute('aria-selected', n===name);
+  });
+  syncDynamicSticky();
+  updateRoute();
+  if(typeof renderCroAll==='function') safeRun(renderCroAll, 'painel de CRO');
+}
+
 function switchCrmSub(name){
   ['email','automacoes','transmissoes','calendario'].forEach(n=>{
     document.getElementById('crmpanel-'+n).classList.toggle('active', n===name);
@@ -1426,6 +1566,7 @@ function switchCrmSub(name){
 const ROUTES = {
   vendas:   {slug:'vendas',   btn:'vdbtn-',  sw:switchVendasSub,    subs:{cupons:'cupons'}},
   seo:      {slug:'seo',      btn:'seobtn-', sw:switchSeoSub,       subs:{geral:'visao-geral', consultas:'consultas', paginas:'paginas', catalogo:'catalogo', mercado:'mercado'}},
+  cro:      {slug:'cro',      btn:'crobtn-', sw:switchCroSub,       subs:{funil:'funil', categorias:'categorias', produtos:'produtos', checkout:'checkout', conferencia:'conferencia'}},
   crm:      {slug:'crm',      btn:'crmbtn-', sw:switchCrmSub,       subs:{email:'canal', automacoes:'automacoes', transmissoes:'transmissoes', calendario:'calendario'}},
   produto:  {slug:'produto',  btn:'tabbtn-', sw:switchTab,          subs:{abc:'curva-abc', estoque:'estoque', desconto:'descontos', crosssell:'venda-cruzada', 'avise-me':'demanda-reprimida', reposicoes:'reposicoes', compras:'compras'}},
   deposito: {slug:'logistica',btn:'depbtn-', sw:switchDepositoSub,  subs:{prateleiras:'deposito', expedicao:'expedicao'}},
@@ -1647,7 +1788,8 @@ const initDateRangePicker = (function(){
       const maxD = activeCtx.maxDate || todayISO();
       let start, end = maxD;
       const preset = btn.dataset.preset;
-      if(preset==='month') start = maxD.slice(0,8) + '01';
+      if(preset==='1d'){ const y = addDays(todayISO(), -1); end = y > maxD ? maxD : y; start = end; }
+      else if(preset==='month') start = maxD.slice(0,8) + '01';
       else if(preset==='7d') start = addDays(maxD, -6);
       else if(preset==='30d') start = addDays(maxD, -29);
       else if(preset==='3m') start = addDays(maxD, -90);
@@ -1861,6 +2003,7 @@ function applyTheme(theme, rerender){
       safeRun(renderPadroes, 'Padrões (troca de tema)');
       safeRun(renderDepositoSaudeCharts, 'gráfico do Depósito (troca de tema)');
       if(typeof renderSeoAll==='function') safeRun(renderSeoAll, 'SEO (troca de tema)');
+      if(typeof renderCroAll==='function') safeRun(renderCroAll, 'CRO (troca de tema)');
     });
   }
 }
@@ -1881,7 +2024,7 @@ function syncDynamicSticky(){
   if(movedSub && movedSubPh){ movedSubPh.replaceWith(movedSub); movedSub=null; movedSubPh=null; }
   if(movedCard && movedCardPh){ movedCardPh.replaceWith(movedCard); movedCard=null; movedCardPh=null; }
   if(!headerPinned) return;
-  const topPanel = document.querySelector('#toppanel-padroes.active, #toppanel-produto.active, #toppanel-deposito.active, #toppanel-vendas.active, #toppanel-crm.active, #toppanel-seo.active');
+  const topPanel = document.querySelector('#toppanel-padroes.active, #toppanel-produto.active, #toppanel-deposito.active, #toppanel-vendas.active, #toppanel-crm.active, #toppanel-seo.active, #toppanel-cro.active');
   const sub = topPanel ? topPanel.querySelector(':scope > .tabbar.sub') : null;
   const leafPanel = topPanel ? (topPanel.querySelector(':scope > .panel.active') || topPanel) : null;
   const card = leafPanel ? (leafPanel.querySelector(':scope > .card') || leafPanel.querySelector(':scope > .subpanel.active > .card')) : null;
@@ -3541,6 +3684,453 @@ if(seoHasData){
     document.getElementById('seop-texto').addEventListener('input', renderSeoPaginas);
   }
   renderSeoAll();
+}
+
+/* ---------------- TOP TAB: CRO ---------------- */
+
+const croDisp = DATA.cro_dispositivos || [];
+const croCan = DATA.cro_canais || [];
+const croFunil = DATA.cro_funil || [];              // [data, disp, canal, sessoes, viu, carrinho, inicio, dados, frete, pagamento, concluido, compras, receita]
+const croEntrada = DATA.cro_entrada || [];          // [data, disp, canal, tipo(0 home,1 categoria,2 produto,3 outras), sessoes, compras]
+const croPaginasLista = DATA.cro_paginas_lista || [];
+const croCategorias = DATA.cro_categorias || [];    // [data, disp, canal, idxPagina, sessoes, viu, carrinho, compras, receita]
+const croProdutos = DATA.cro_produtos || [];        // [data, disp, produtoId, views, carrinho, compras, receita]
+const croCodigos = DATA.cro_codigos || [];
+const croCheckout = DATA.cro_checkout || [];        // [data, disp, canal, idxCodigo, mascara]
+const croGa4Pedidos = DATA.cro_ga4_pedidos || [];   // [data, transactionId, receita]
+const croVndaPedidos = DATA.cro_vnda_pedidos || []; // [code, data, status, total]
+const croCatalogo = (DATA.cro_catalogo || {}).produtos || {}; // id -> [referencia, nome, estoque, {tamanho: estoque}]
+
+const croDatas = Array.from(new Set(croFunil.map(r=>r[0]))).sort();
+const croMin = croDatas[0] || '', croMax = croDatas[croDatas.length-1] || '';
+const croHasData = croDatas.length > 0;
+// o GA4 reprocessa a atribuicao nos ultimos 2 dias: esses dias aparecem como provisorios
+const croProv = new Set(croDatas.slice(-2));
+const CRO_DISP_LABEL = {mobile:'Celular', desktop:'Computador', tablet:'Tablet', 'smart tv':'Smart TV'};
+const CRO_ETAPAS = ['Sessões','Viu produto','Adicionou ao carrinho','Início do checkout','Dados pessoais','Frete','Pagamento','Pedido concluído'];
+const CRO_CK_ETAPAS = ['Início do checkout','Dados pessoais','Frete','Pagamento','Pedido concluído'];
+const CRO_TIPOS = ['Home','Categoria','Produto','Outras'];
+
+(function croSetupFilters(){
+  const d = document.getElementById('cro-dispositivo'), c = document.getElementById('cro-canal');
+  d.innerHTML = '<option value="all">Todos</option>' + croDisp.map((x,i)=>`<option value="${i}">${seoEsc(CRO_DISP_LABEL[x] || x)}</option>`).join('');
+  c.innerHTML = '<option value="all">Todos</option>' + croCan.map((x,i)=>`<option value="${i}">${seoEsc(x)}</option>`).join('');
+})();
+
+function croSel(){
+  const d = document.getElementById('cro-dispositivo').value, c = document.getElementById('cro-canal').value;
+  return {d: d==='all' ? -1 : +d, c: c==='all' ? -1 : +c};
+}
+function croPass(r, f, usaCanal){
+  return (f.d<0 || r[1]===f.d) && (usaCanal===false || f.c<0 || r[2]===f.c);
+}
+function croPrev(start, end){
+  const dur = dayDiff(start, end) + 1, pe = addDays(start, -1);
+  return [addDays(pe, -(dur-1)), pe];
+}
+function croYesterday(){
+  const y = addDays(todayISO(), -1);
+  return y > croMax ? croMax : y;
+}
+
+/* ---- variacoes ---- */
+function croArrow(t, eps){ return t>eps ? '&#8599;' : (t<-eps ? '&#8600;' : '&#8594;'); }
+function croDeltaRel(cur, prev, invert){
+  if(!prev) return '<div class="cro-sub"><span class="delta flat">sem base</span></div>';
+  const t = (cur-prev)/prev*100, good = invert ? t<-0.5 : t>0.5, bad = invert ? t>0.5 : t<-0.5;
+  return `<div class="cro-sub"><span class="delta ${good?'up':(bad?'down':'flat')}">${croArrow(t,0.5)} ${fmtPct(t)}</span></div>`;
+}
+function croDeltaPP(cur, prev){
+  if(prev==null || (!prev && !cur)) return '<div class="cro-sub"><span class="delta flat">sem base</span></div>';
+  const d = cur - prev;
+  const txt = Math.abs(d)<0.05 ? '0,0' : ((d>0?'+':'')+d.toFixed(1).replace('.',','));
+  return `<div class="cro-sub"><span class="delta ${d>0.05?'up':(d<-0.05?'down':'flat')}">${croArrow(d,0.05)} ${txt} p.p.</span></div>`;
+}
+const croPct = (a, b) => b>0 ? a/b*100 : 0;
+
+/* ---- periodo e filtros ---- */
+let croStartInput = null, croEndInput = null;
+function croFmtBR(iso){ return iso.split('-').reverse().join('/'); }
+function croSetRange(s, e){
+  croStartInput.value = s; croEndInput.value = e;
+  document.getElementById('cro-daterange-btn').textContent = `${croFmtBR(s)} - ${croFmtBR(e)}`;
+}
+if(croHasData){
+  croStartInput = document.getElementById('cro-start'); croEndInput = document.getElementById('cro-end');
+  croStartInput.min = croEndInput.min = croMin; croStartInput.max = croEndInput.max = croMax;
+  const y = croYesterday();
+  croStartInput.value = addDays(y,-6) < croMin ? croMin : addDays(y,-6); croEndInput.value = y;
+  initDateRangePicker('cro-daterange-btn', 'cro-start', 'cro-end');
+}
+
+function croAtivo(){
+  const el = document.querySelector('#toppanel-cro .subpanel.active');
+  return el ? el.id.replace('cropanel-','') : 'funil';
+}
+function croAtualizaAviso(start, end){
+  const prov = Array.from(croProv).filter(d=>d>=start && d<=end).sort();
+  const sub = croAtivo();
+  const filtros = sub==='produtos' ? 'O filtro de canal não se aplica a esta tabela.'
+                : (sub==='conferencia' ? 'Os filtros de dispositivo e canal não se aplicam a esta aba.' : '');
+  document.getElementById('cro-notice').innerHTML =
+    (prov.length ? `<span class="badge badge-orange">Dados provisórios</span> ${prov.map(croFmtBR).join(' e ')}: o GA4 ainda reprocessa a atribuição nos últimos 2 dias, então esses números podem mudar. ` : '') + filtros;
+  document.getElementById('cro-compare-hint').textContent = comparePeriodText(start, end);
+}
+
+/* ---- funil ---- */
+function croFunilAgg(start, end, f){
+  const a = new Array(10).fill(0);
+  for(const r of croFunil){
+    if(r[0]<start || r[0]>end || !croPass(r, f)) continue;
+    for(let i=0;i<10;i++) a[i] += r[3+i];
+  }
+  return a; // 0..7 etapas, 8 compras, 9 receita
+}
+function croFunnelHTML(vals, prevVals, labels, mostraBase){
+  const base = vals[0] || 0;
+  return labels.map((nome, i)=>{
+    const v = vals[i], p = prevVals[i];
+    const w = base>0 ? Math.max(v/base*100, v>0 ? 1.5 : 0) : 0;
+    const ultimo = i === labels.length-1;
+    const seguiu = !ultimo && v>0 ? vals[i+1]/v*100 : null;
+    const seguiuPrev = !ultimo && p>0 ? prevVals[i+1]/p*100 : null;
+    return `<div class="cro-step">
+      <div><div class="lbl">${nome}</div><div class="pname">${i===0 && mostraBase ? '100% das sessões' : fmtPctPlain(croPct(v, base)) + (mostraBase ? ' das sessões' : ' dos checkouts iniciados')}</div></div>
+      <div class="cro-bar"><span style="width:${w}%"></span></div>
+      <div class="val">${fmtInt.format(v)}${croDeltaRel(v, p)}</div>
+      <div class="nxt">${ultimo ? '' : '→ ' + fmtPctPlain(seguiu||0) + ' seguiram'}${ultimo || seguiu==null ? '' : croDeltaPP(seguiu, seguiuPrev)}</div>
+    </div>`;
+  }).join('');
+}
+
+let croChartHandle = null;
+function croLineChart(canvasId, labels, datasets){
+  if(typeof Chart === 'undefined') return;
+  const cv = document.getElementById(canvasId);
+  if(!cv) return;
+  if(croChartHandle) croChartHandle.destroy();
+  const css = getComputedStyle(document.documentElement);
+  const muted = css.getPropertyValue('--text-muted'), grid = css.getPropertyValue('--grid'), primary = css.getPropertyValue('--text-primary');
+  croChartHandle = new Chart(cv, {
+    data:{labels, datasets: datasets.map((d,i)=>({type:'line', label:d.label, data:d.data, yAxisID:d.axis, borderColor:seriesColor(i), backgroundColor:seriesColor(i),
+      borderWidth:2, pointRadius:0, pointHoverRadius:4, tension:0.15,
+      segment:{borderDash: c => croProv.has(labels[c.p1DataIndex]) ? [5,4] : undefined}}))},
+    options:{
+      responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+      plugins:{legend:{position:'top', labels:{color:primary}},
+        tooltip:{callbacks:{label:c=>{ const d = datasets[c.datasetIndex]; return d.label + ': ' + (d.pct ? fmtPctPlain(c.parsed.y) : fmtInt.format(c.parsed.y)) + (croProv.has(labels[c.dataIndex]) ? ' (provisório)' : ''); }}}},
+      scales:{
+        x:{grid:{display:false}, ticks:{color:muted, maxRotation:0, autoSkip:true}},
+        y:{position:'left', grid:{color:grid}, ticks:{color:muted}},
+        y1:{position:'right', grid:{display:false}, ticks:{color:muted, callback:v=>fmtPctPlain(v)}},
+      }
+    }
+  });
+}
+
+function croEntradaAgg(start, end, f){
+  const a = [[0,0],[0,0],[0,0],[0,0]];
+  for(const r of croEntrada){
+    if(r[0]<start || r[0]>end || !croPass(r, f)) continue;
+    a[r[3]][0] += r[4]; a[r[3]][1] += r[5];
+  }
+  return a;
+}
+const CRO_ENTRADA_COLUMNS = [
+  {key:'tipo', label:'Tipo de página de entrada', type:'text', cellClass:'', format:r=>r.tipo, sortValue:r=>r.tipo},
+  {key:'sess', label:'Sessões', type:'number', format:r=>fmtInt.format(r.sess) + croDeltaRel(r.sess, r.prevSess), sortValue:r=>r.sess},
+  {key:'share', label:'% das sessões', type:'number', format:r=>fmtPctPlain(r.share) + croDeltaPP(r.share, r.prevShare), sortValue:r=>r.share},
+  {key:'comp', label:'Compras', type:'number', format:r=>fmtInt.format(r.comp) + croDeltaRel(r.comp, r.prevComp), sortValue:r=>r.comp},
+  {key:'conv', label:'Conversão', type:'number', format:r=>fmtPctPlain(r.conv) + croDeltaPP(r.conv, r.prevConv), sortValue:r=>r.conv},
+];
+
+function renderCroFunil(){
+  if(!croHasData) return;
+  const start = croStartInput.value, end = croEndInput.value;
+  if(!start || !end) return;
+  const f = croSel(), [ps, pe] = croPrev(start, end);
+  const cur = croFunilAgg(start, end, f), prv = croFunilAgg(ps, pe, f);
+
+  const conv = croPct(cur[8], cur[0]), convP = croPct(prv[8], prv[0]);
+  const tk = cur[8]>0 ? cur[9]/cur[8] : 0, tkP = prv[8]>0 ? prv[9]/prv[8] : 0;
+  document.getElementById('cro-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Sessões</p><p class="value">${fmtInt.format(cur[0])}</p>${crmDeltaHTML(cur[0], prv[0])}</div>
+    <div class="kpi"><p class="label">Compras</p><p class="value">${fmtInt.format(cur[8])}</p>${crmDeltaHTML(cur[8], prv[8])}</div>
+    <div class="kpi"><p class="label">Conversão</p><p class="value">${conv.toFixed(2).replace('.',',')}%</p>${croDeltaPP(conv, convP)}</div>
+    <div class="kpi"><p class="label">Receita (GA4)</p><p class="value">${fmtBRL.format(cur[9])}</p>${crmDeltaHTML(cur[9], prv[9])}</div>
+    <div class="kpi"><p class="label">Ticket médio</p><p class="value">${fmtBRL.format(tk)}</p>${crmDeltaHTML(tk, tkP)}</div>
+  `;
+  document.getElementById('cro-funil-steps').innerHTML = croFunnelHTML(cur, prv, CRO_ETAPAS, true);
+
+  const dias = new Map();
+  for(const r of croFunil){
+    if(r[0]<start || r[0]>end || !croPass(r, f)) continue;
+    const b = dias.get(r[0]) || [0,0]; b[0] += r[3]; b[1] += r[11]; dias.set(r[0], b);
+  }
+  const ds = Array.from(dias.entries()).sort((a,b)=>a[0]<b[0]?-1:1);
+  croLineChart('chart-cro-dia', ds.map(x=>x[0]), [
+    {label:'Sessões', data:ds.map(x=>x[1][0]), axis:'y'},
+    {label:'Conversão', data:ds.map(x=>x[1][0]>0 ? Math.round(x[1][1]/x[1][0]*10000)/100 : 0), axis:'y1', pct:true},
+  ]);
+
+  const e = croEntradaAgg(start, end, f), ep = croEntradaAgg(ps, pe, f);
+  const tot = e.reduce((s,x)=>s+x[0],0), totP = ep.reduce((s,x)=>s+x[0],0);
+  const rows = CRO_TIPOS.map((tipo,i)=>({tipo, sess:e[i][0], comp:e[i][1], share:croPct(e[i][0], tot), conv:croPct(e[i][1], e[i][0]),
+    prevSess:ep[i][0], prevComp:ep[i][1], prevShare:croPct(ep[i][0], totP), prevConv: ep[i][0]>0 ? croPct(ep[i][1], ep[i][0]) : null}));
+  renderSortableTable('table-cro-entrada', CRO_ENTRADA_COLUMNS, rows, 'Sem sessões no período.');
+}
+attachSort('table-cro-entrada', renderCroFunil);
+
+/* ---- categorias ---- */
+function croCatAgg(start, end, f){
+  const m = new Map();
+  for(const r of croCategorias){
+    if(r[0]<start || r[0]>end || !croPass(r, f)) continue;
+    const b = m.get(r[3]) || [0,0,0,0,0];
+    b[0] += r[4]; b[1] += r[5]; b[2] += r[6]; b[3] += r[7]; b[4] += r[8];
+    m.set(r[3], b);
+  }
+  return m;
+}
+const CRO_CAT_COLUMNS = [
+  {key:'pagina', label:'Página', type:'text', cellClass:'', format:r=>seoEsc(r.pagina), sortValue:r=>r.pagina},
+  {key:'sess', label:'Sessões', type:'number', format:r=>fmtInt.format(r.sess) + croDeltaRel(r.sess, r.p ? r.p[0] : 0), sortValue:r=>r.sess},
+  {key:'viu', label:'% viu produto', type:'number', format:r=>fmtPctPlain(r.viu) + croDeltaPP(r.viu, r.p ? croPct(r.p[1], r.p[0]) : null), sortValue:r=>r.viu},
+  {key:'car', label:'% adicionou ao carrinho', type:'number', format:r=>fmtPctPlain(r.car) + croDeltaPP(r.car, r.p ? croPct(r.p[2], r.p[0]) : null), sortValue:r=>r.car},
+  {key:'comp', label:'Compras', type:'number', format:r=>fmtInt.format(r.comp) + croDeltaRel(r.comp, r.p ? r.p[3] : 0), sortValue:r=>r.comp},
+  {key:'rec', label:'Receita', type:'number', format:r=>fmtBRL.format(r.rec) + croDeltaRel(r.rec, r.p ? r.p[4] : 0), sortValue:r=>r.rec},
+  {key:'conv', label:'Conversão', type:'number', format:r=>(r.conv.toFixed(2).replace('.',',')) + '%' + croDeltaPP(r.conv, r.p ? croPct(r.p[3], r.p[0]) : null), sortValue:r=>r.conv},
+];
+function renderCroCategorias(){
+  if(!croHasData) return;
+  const start = croStartInput.value, end = croEndInput.value;
+  if(!start || !end) return;
+  const f = croSel(), [ps, pe] = croPrev(start, end);
+  const cur = croCatAgg(start, end, f), prv = croCatAgg(ps, pe, f);
+  const texto = (document.getElementById('cro-cat-texto').value || '').trim().toLowerCase();
+  const rows = [];
+  cur.forEach((b, idx)=>{
+    const pagina = croPaginasLista[idx];
+    if(texto && !pagina.toLowerCase().includes(texto)) return;
+    rows.push({pagina, sess:b[0], viu:croPct(b[1], b[0]), car:croPct(b[2], b[0]), comp:b[3], rec:b[4], conv:croPct(b[3], b[0]), p:prv.get(idx) || null});
+  });
+  rows.sort((a,b)=> b.sess - a.sess);
+  renderSortableTable('table-cro-categorias', CRO_CAT_COLUMNS, rows.slice(0, 500), 'Nenhuma página de categoria com sessões no período.');
+}
+attachSort('table-cro-categorias', renderCroCategorias);
+
+/* ---- produtos ---- */
+const CRO_TAMANHOS = ['34','35','36','37','38','39'];
+function croGrade(prod){
+  // [tamanhos 34-39 que o produto tem, quantos sem estoque]
+  const tams = prod ? prod[3] : {};
+  const tem = CRO_TAMANHOS.filter(t=>Object.prototype.hasOwnProperty.call(tams, t));
+  return {tem, sem: tem.filter(t=>!(tams[t] > 0)).length};
+}
+function croGradeHTML(prod){
+  const g = croGrade(prod);
+  if(!g.tem.length) return '<span class="hint" style="margin:0;">—</span>';
+  return '<div class="cro-tams">' + g.tem.map(t=>`<span class="cro-tam ${prod[3][t]>0 ? 'ok' : 'no'}" title="${t}: ${prod[3][t]} em estoque">${t}</span>`).join('') + '</div>';
+}
+function croProdAgg(start, end, f){
+  const m = new Map();
+  for(const r of croProdutos){
+    if(r[0]<start || r[0]>end || (f.d>=0 && r[1]!==f.d)) continue;
+    const b = m.get(r[2]) || [0,0,0,0];
+    b[0] += r[3]; b[1] += r[4]; b[2] += r[5]; b[3] += r[6];
+    m.set(r[2], b);
+  }
+  return m;
+}
+const CRO_PROD_COLUMNS = [
+  {key:'nome', label:'Produto', type:'text', cellClass:'', format:r=>productCell(seoEsc(r.nome), seoEsc(r.ref)), sortValue:r=>r.nome},
+  {key:'views', label:'Visualizações', type:'number', format:r=>fmtInt.format(r.views) + croDeltaRel(r.views, r.p ? r.p[0] : 0), sortValue:r=>r.views},
+  {key:'car', label:'% adicionou ao carrinho', type:'number', format:r=>fmtPctPlain(r.car) + croDeltaPP(r.car, r.p ? croPct(r.p[1], r.p[0]) : null), sortValue:r=>r.car},
+  {key:'comp', label:'% compra', type:'number', format:r=>(r.comp.toFixed(2).replace('.',',')) + '%' + `<div class="cro-sub"><span class="pname">${fmtInt.format(r.compras)} compra${r.compras===1?'':'s'}</span></div>`, sortValue:r=>r.comp},
+  {key:'rec', label:'Receita', type:'number', format:r=>fmtBRL.format(r.rec) + croDeltaRel(r.rec, r.p ? r.p[3] : 0), sortValue:r=>r.rec},
+  {key:'grade', label:'Grade 34 a 39', type:'text', cellClass:'', format:r=>croGradeHTML(r.prod), sortValue:r=>r.gradeSem},
+  {key:'estoque', label:'Estoque', type:'number', format:r=> !r.prod ? '—' : (r.estoque===0 ? '<span style="color:var(--crit); font-weight:600;">sem estoque</span>' : fmtInt.format(r.estoque)), sortValue:r=>r.estoque},
+  {key:'alerta', label:'Alerta', type:'text', cellClass:'', format:r=>{
+      const a = [];
+      if(r.atencao) a.push('<span class="badge badge-orange">muito visto, pouco adicionado</span>');
+      if(r.furada) a.push('<span class="badge badge-crit">grade furada</span>');
+      return a.join(' ') || '';
+    }, sortValue:r=>(r.atencao?2:0)+(r.furada?1:0)},
+];
+function renderCroProdutos(){
+  if(!croHasData) return;
+  const start = croStartInput.value, end = croEndInput.value;
+  if(!start || !end) return;
+  const f = croSel(), [ps, pe] = croPrev(start, end);
+  const cur = croProdAgg(start, end, f), prv = croProdAgg(ps, pe, f);
+  const texto = (document.getElementById('cro-prod-texto').value || '').trim().toLowerCase();
+  const filtro = document.getElementById('cro-prod-filtro').value;
+
+  let tv = 0, tc = 0;
+  cur.forEach(b=>{ tv += b[0]; tc += b[1]; });
+  const taxaMedia = croPct(tc, tv);
+  const vistos = Array.from(cur.values()).map(b=>b[0]).filter(v=>v>0).sort((a,b)=>a-b);
+  const corte = Math.max(50, vistos.length ? vistos[Math.floor(vistos.length*0.75)] : 0);
+
+  const todos = [];
+  cur.forEach((b, id)=>{
+    const prod = croCatalogo[String(id)] || null;
+    const g = croGrade(prod);
+    const car = croPct(b[1], b[0]);
+    todos.push({id, prod, nome: prod ? prod[1] : 'Produto ' + id, ref: prod ? prod[0] : '', views:b[0], car, comp:croPct(b[2], b[0]), compras:b[2], rec:b[3],
+      p: prv.get(id) || null, estoque: prod ? prod[2] : -1, gradeSem: g.sem,
+      atencao: b[0] >= corte && car < taxaMedia/2,
+      furada: !!prod && prod[2] > 0 && g.sem > 0});
+  });
+  const atencao = todos.filter(r=>r.atencao), furadas = todos.filter(r=>r.furada);
+  const viewsFuradas = furadas.reduce((s,r)=>s+r.views, 0);
+  document.getElementById('cro-prod-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Produtos com visualização</p><p class="value">${fmtInt.format(todos.length)}</p><span class="delta flat">no período</span></div>
+    <div class="kpi"><p class="label">Taxa média de adição ao carrinho</p><p class="value">${fmtPctPlain(taxaMedia)}</p><span class="delta flat">adições / visualizações</span></div>
+    <div class="kpi"><p class="label">Muito vistos e pouco adicionados</p><p class="value">${fmtInt.format(atencao.length)}</p><span class="delta ${atencao.length>0?'down':'flat'}">a partir de ${fmtInt.format(corte)} visualizações</span></div>
+    <div class="kpi"><p class="label">Produtos com grade furada</p><p class="value">${fmtInt.format(furadas.length)}</p><span class="delta ${furadas.length>0?'down':'flat'}">${fmtInt.format(viewsFuradas)} visualizações</span></div>
+  `;
+  const rows = todos.filter(r=>{
+    if(texto && !(r.nome.toLowerCase().includes(texto) || r.ref.toLowerCase().includes(texto))) return false;
+    if(filtro==='atencao') return r.atencao;
+    if(filtro==='furada') return r.furada;
+    if(filtro==='semestoque') return r.prod && r.estoque===0;
+    return true;
+  }).sort((a,b)=>b.views-a.views);
+  renderSortableTable('table-cro-produtos', CRO_PROD_COLUMNS, rows.slice(0, 600), 'Nenhum produto com o filtro atual.');
+}
+attachSort('table-cro-produtos', renderCroProdutos);
+
+/* ---- checkout (checkouts unicos) ---- */
+function croCheckoutAgg(start, end, f){
+  const m = new Map();
+  for(const r of croCheckout){
+    if(r[0]<start || r[0]>end || !croPass(r, f)) continue;
+    m.set(r[3], (m.get(r[3]) || 0) | r[4]);
+  }
+  const atl = [0,0,0,0,0];
+  let pulouFrete = 0, soConcluido = 0;
+  m.forEach(mask=>{
+    for(let i=0;i<5;i++) if(mask >= (1<<i)) atl[i]++;
+    if(mask >= 8 && mask !== 16 && !(mask & 4)) pulouFrete++;
+    if(mask === 16) soConcluido++;
+  });
+  return {atl, pulouFrete, soConcluido, total:m.size};
+}
+function renderCroCheckout(){
+  if(!croHasData) return;
+  const start = croStartInput.value, end = croEndInput.value;
+  if(!start || !end) return;
+  const f = croSel(), [ps, pe] = croPrev(start, end);
+  const c = croCheckoutAgg(start, end, f), p = croCheckoutAgg(ps, pe, f);
+  const taxa = croPct(c.atl[4], c.atl[0]), taxaP = croPct(p.atl[4], p.atl[0]);
+  document.getElementById('cro-ck-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Checkouts iniciados</p><p class="value">${fmtInt.format(c.atl[0])}</p>${crmDeltaHTML(c.atl[0], p.atl[0])}</div>
+    <div class="kpi"><p class="label">Checkouts concluídos</p><p class="value">${fmtInt.format(c.atl[4])}</p>${crmDeltaHTML(c.atl[4], p.atl[4])}</div>
+    <div class="kpi"><p class="label">Taxa de conclusão</p><p class="value">${fmtPctPlain(taxa)}</p>${croDeltaPP(taxa, taxaP)}</div>
+    <div class="kpi"><p class="label">Pularam a etapa de frete</p><p class="value">${fmtInt.format(c.pulouFrete)}</p><span class="delta flat">retirada na loja ou endereço salvo</span></div>
+    <div class="kpi"><p class="label">Só na página de concluído</p><p class="value">${fmtInt.format(c.soConcluido)}</p><span class="delta flat">voltaram em outra sessão</span></div>
+  `;
+  document.getElementById('cro-ck-steps').innerHTML = croFunnelHTML(c.atl, p.atl, CRO_CK_ETAPAS, false);
+  document.getElementById('cro-ck-nota').textContent =
+    `${fmtInt.format(c.total)} códigos de checkout distintos no período. Um código conta uma vez, mesmo que apareça em mais de um dia. ` +
+    `Quem aparece só na página de concluído voltou a ela em outra sessão (por exemplo, depois de pagar o Pix), por isso entra no total de concluídos sem ter passado pelas etapas anteriores neste período.`;
+}
+
+/* ---- conferencia GA4 x VNDA ---- */
+const CRO_CONF_COLUMNS = [
+  {key:'data', label:'Dia', type:'text', cellClass:'', format:r=>croFmtBR(r.data) + (croProv.has(r.data) ? ' <span class="badge badge-orange">provisório</span>' : ''), sortValue:r=>r.data},
+  {key:'ga', label:'Pedidos no GA4', type:'number', format:r=>fmtInt.format(r.ga), sortValue:r=>r.ga},
+  {key:'vn', label:'Confirmados na VNDA', type:'number', format:r=>fmtInt.format(r.vn), sortValue:r=>r.vn},
+  {key:'cob', label:'Cobertura', type:'number', format:r=> r.vn===0 ? '—' : `<span class="${r.cob<95?'trend-down':(r.cob<100?'':'trend-up')}" style="font-weight:600;">${fmtPctPlain(r.cob)}</span>`, sortValue:r=>r.vn===0 ? 101 : r.cob},
+  {key:'faltam', label:'Faltam no GA4', type:'number', format:r=> r.faltam>0 ? `<span style="color:var(--crit); font-weight:600;">${r.faltam}</span>` : '0', sortValue:r=>r.faltam},
+  {key:'recGa', label:'Receita GA4', type:'number', format:r=>fmtBRL.format(r.recGa), sortValue:r=>r.recGa},
+  {key:'recVn', label:'Faturamento VNDA', type:'number', format:r=>fmtBRL.format(r.recVn), sortValue:r=>r.recVn},
+  {key:'razao', label:'GA4 / VNDA', type:'number', format:r=> r.recVn>0 ? fmtPctPlain(r.recGa/r.recVn*100) : '—', sortValue:r=> r.recVn>0 ? r.recGa/r.recVn : 0},
+  {key:'nao', label:'Não confirmados', type:'number', format:r=>fmtInt.format(r.nao), sortValue:r=>r.nao},
+];
+const CRO_FALTAM_COLUMNS = [
+  {key:'code', label:'Pedido', type:'text', cellClass:'', format:r=>seoEsc(r.code), sortValue:r=>r.code},
+  {key:'data', label:'Data', type:'text', cellClass:'', format:r=>croFmtBR(r.data), sortValue:r=>r.data},
+  {key:'total', label:'Valor', type:'number', format:r=>fmtBRL.format(r.total), sortValue:r=>r.total},
+];
+const CRO_NAOPAGOS_COLUMNS = [
+  {key:'code', label:'Pedido', type:'text', cellClass:'', format:r=>seoEsc(r.code), sortValue:r=>r.code},
+  {key:'data', label:'Data', type:'text', cellClass:'', format:r=>croFmtBR(r.data), sortValue:r=>r.data},
+  {key:'status', label:'Status', type:'text', cellClass:'', format:r=>seoEsc(r.status), sortValue:r=>r.status},
+  {key:'total', label:'Valor', type:'number', format:r=>fmtBRL.format(r.total), sortValue:r=>r.total},
+];
+function renderCroConferencia(){
+  if(!croHasData) return;
+  const start = croStartInput.value, end = croEndInput.value;
+  if(!start || !end) return;
+  const gaPorDia = new Map(), gaIds = new Set();
+  for(const r of croGa4Pedidos){
+    if(r[0]<start || r[0]>end) continue;
+    const b = gaPorDia.get(r[0]) || {n:0, rec:0}; b.n++; b.rec += r[2]; gaPorDia.set(r[0], b);
+    gaIds.add(r[1]);
+  }
+  const vnPorDia = new Map(), faltam = [], naoPagos = [];
+  for(const o of croVndaPedidos){
+    if(o[1]<start || o[1]>end) continue;
+    const b = vnPorDia.get(o[1]) || {conf:0, rec:0, faltam:0, nao:0}; vnPorDia.set(o[1], b);
+    if(o[2]==='confirmed'){
+      b.conf++; b.rec += o[3];
+      if(!gaIds.has(o[0])){ b.faltam++; faltam.push({code:o[0], data:o[1], total:o[3]}); }
+    } else { b.nao++; naoPagos.push({code:o[0], data:o[1], status:o[2], total:o[3]}); }
+  }
+  const dias = Array.from(new Set([...gaPorDia.keys(), ...vnPorDia.keys()])).sort().reverse();
+  const rows = dias.map(d=>{
+    const g = gaPorDia.get(d) || {n:0, rec:0}, v = vnPorDia.get(d) || {conf:0, rec:0, faltam:0, nao:0};
+    return {data:d, ga:g.n, vn:v.conf, cob: v.conf>0 ? (v.conf - v.faltam)/v.conf*100 : 0, faltam:v.faltam, recGa:g.rec, recVn:v.rec, nao:v.nao};
+  });
+  const tConf = rows.reduce((s,r)=>s+r.vn,0), tFalt = rows.reduce((s,r)=>s+r.faltam,0);
+  const tGa = rows.reduce((s,r)=>s+r.ga,0), tRecGa = rows.reduce((s,r)=>s+r.recGa,0), tRecVn = rows.reduce((s,r)=>s+r.recVn,0);
+  const cob = tConf>0 ? (tConf-tFalt)/tConf*100 : 0;
+  const [ps, pe] = croPrev(start, end);
+  let pConf = 0, pFalt = 0;
+  const pIds = new Set(croGa4Pedidos.filter(r=>r[0]>=ps && r[0]<=pe).map(r=>r[1]));
+  for(const o of croVndaPedidos){ if(o[1]>=ps && o[1]<=pe && o[2]==='confirmed'){ pConf++; if(!pIds.has(o[0])) pFalt++; } }
+  const cobP = pConf>0 ? (pConf-pFalt)/pConf*100 : 0;
+  document.getElementById('cro-cf-kpirow').innerHTML = `
+    <div class="kpi"><p class="label">Cobertura do GA4</p><p class="value">${fmtPctPlain(cob)}</p>${pConf>0 ? croDeltaPP(cob, cobP) : '<span class="delta flat">sem base de comparação</span>'}</div>
+    <div class="kpi"><p class="label">Pedidos confirmados na VNDA</p><p class="value">${fmtInt.format(tConf)}</p><span class="delta flat">${fmtInt.format(tFalt)} fora do GA4</span></div>
+    <div class="kpi"><p class="label">Pedidos no GA4</p><p class="value">${fmtInt.format(tGa)}</p><span class="delta flat">inclui cancelados</span></div>
+    <div class="kpi"><p class="label">Receita GA4 / faturamento VNDA</p><p class="value">${tRecVn>0 ? fmtPctPlain(tRecGa/tRecVn*100) : '—'}</p><span class="delta flat">${fmtBRL.format(tRecGa)} / ${fmtBRL.format(tRecVn)}</span></div>
+    <div class="kpi"><p class="label">Gerados e não confirmados</p><p class="value">${fmtInt.format(naoPagos.length)}</p><span class="delta flat">${fmtBRL.format(naoPagos.reduce((s,r)=>s+r.total,0))}</span></div>
+  `;
+  renderSortableTable('table-cro-conf', CRO_CONF_COLUMNS, rows, 'Sem pedidos no período.');
+  renderSortableTable('table-cro-faltam', CRO_FALTAM_COLUMNS, faltam.sort((a,b)=> a.data<b.data?1:-1), 'Todos os pedidos confirmados aparecem no GA4.');
+  renderSortableTable('table-cro-naopagos', CRO_NAOPAGOS_COLUMNS, naoPagos.sort((a,b)=> a.data<b.data?1:-1), 'Nenhum pedido gerado e não confirmado no período.');
+}
+attachSort('table-cro-conf', renderCroConferencia);
+attachSort('table-cro-faltam', renderCroConferencia);
+attachSort('table-cro-naopagos', renderCroConferencia);
+
+function renderCroAll(){
+  if(!croHasData){
+    document.getElementById('cro-notice').textContent = 'Ainda não há dados de CRO. Eles chegam na próxima atualização diária.';
+    return;
+  }
+  croAtualizaAviso(croStartInput.value, croEndInput.value);
+  safeRun(renderCroFunil, 'CRO: funil');
+  safeRun(renderCroCategorias, 'CRO: categorias');
+  safeRun(renderCroProdutos, 'CRO: produtos');
+  safeRun(renderCroCheckout, 'CRO: checkout');
+  safeRun(renderCroConferencia, 'CRO: conferência');
+}
+if(croHasData){
+  const croDesmarcaAtalho = () => document.querySelectorAll('#seg-cro-atalho button').forEach(b=>b.setAttribute('aria-pressed','false'));
+  [croStartInput, croEndInput].forEach(el=>el.addEventListener('change', ()=>{ croDesmarcaAtalho(); renderCroAll(); }));
+  [document.getElementById('cro-dispositivo'), document.getElementById('cro-canal'), document.getElementById('cro-prod-filtro')].forEach(el=>el.addEventListener('change', renderCroAll));
+  [document.getElementById('cro-cat-texto'), document.getElementById('cro-prod-texto')].forEach(el=>el.addEventListener('input', renderCroAll));
+  seg('seg-cro-atalho', v=>{
+    const dias = +v, y = croYesterday();
+    let s = dias===1 ? y : addDays(y, -(dias-1));
+    if(s < croMin) s = croMin;
+    croSetRange(s, y);
+    renderCroAll();
+  });
 }
 
 /* ---------------- TOP TAB: CRM > AUTOMAÇÕES ---------------- */

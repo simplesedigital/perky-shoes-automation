@@ -70,6 +70,13 @@ STATE_FILES = [
     "historico_crm_automacoes.csv",
     "historico_crm_canal.csv",
     "historico_crm_transmissoes.csv",
+    "historico_cro_categorias.csv",
+    "historico_cro_checkout.csv",
+    "historico_cro_entrada.csv",
+    "historico_cro_funil.csv",
+    "historico_cro_ga4_pedidos.csv",
+    "historico_cro_produtos.csv",
+    "cro_catalogo.json",
     "historico_descontos.csv",
     "historico_estoque_eventos.csv",
     "historico_estoque_sku.csv",
@@ -781,7 +788,7 @@ def _sheets_api_get(spreadsheet_id, sheet_gid, want_grid_range=False):
 # "-<id numerico da VNDA>"; cruzamos com o product_id que ja vem no snapshot
 # diario de estoque (historico_estoque_sku.csv) pra chegar na referencia.
 
-GA4_PROPERTY_ID = "316363343"
+GA4_PROPERTY_ID = os.environ.get("GA4_PROPERTY_ID") or "316363343"
 
 
 def fetch_product_pageviews(days=90):
@@ -930,7 +937,12 @@ def _sa_token(scope):
     from google.oauth2 import service_account
     import google.auth.transport.requests
 
-    creds = service_account.Credentials.from_service_account_file(GOOGLE_SERVICE_ACCOUNT_FILE, scopes=[scope])
+    b64 = os.environ.get("GA4_SERVICE_ACCOUNT_JSON_B64")
+    if b64 and "analytics" in scope:
+        info = json.loads(base64.b64decode(b64))
+        creds = service_account.Credentials.from_service_account_info(info, scopes=[scope])
+    else:
+        creds = service_account.Credentials.from_service_account_file(GOOGLE_SERVICE_ACCOUNT_FILE, scopes=[scope])
     creds.refresh(google.auth.transport.requests.Request())
     return creds.token
 
@@ -1103,6 +1115,294 @@ def fetch_seo_data():
     print(f"[seo] GA4 {len(ga_diario)} linhas diarias + {len(ga_pag)} de paginas | "
           f"GSC {len(diario)} diarias, {len(consultas)} consultas, {len(paginas)} paginas | "
           f"catalogo {len(catalogo['produtos'])} produtos, {len(catalogo['tags'])} tags")
+
+
+# ---------------- PARTE 2K: CRO (funil de conversao no GA4 + grade da VNDA) ----------------
+# Tudo guardado AGREGADO POR DIA (nao so o periodo fechado), pra o filtro de datas e a
+# comparacao com o periodo anterior funcionarem no navegador. Na primeira execucao puxa
+# CRO_BACKFILL_DAYS dias; nas seguintes so refaz os ultimos CRO_REFRESH_DAYS (o GA4
+# reprocessa a atribuicao dos ultimos ~2 dias) e mantem o resto do historico.
+#  - funil: sessoes por etapa (view_item, add_to_cart e paginas do checkout), por dia x
+#    dispositivo x canal. "Sessoes com o evento X" = metrica sessions filtrada por eventName.
+#  - entrada: sessoes e compras por tipo de landingPage (Home / Categoria / Produto / Outras).
+#  - categorias: por landingPage de categoria, sessoes que viram produto, adicionaram ao
+#    carrinho e compraram. Categoria = primeiro segmento do caminho e tag/menu da VNDA.
+#  - produtos: itemsViewed / itemsAddedToCart / itemsPurchased / itemRevenue por itemId (id do
+#    produto na VNDA). Grade (tamanhos 34-39) vem do estoque por variante da VNDA.
+#  - checkout: por codigo de checkout (segmento da URL), mascara de etapas visitadas no dia.
+#  - pedidos GA4: transactionId por dia, pra conferir com os pedidos confirmados da VNDA.
+CRO_BACKFILL_DAYS = 180
+CRO_REFRESH_DAYS = 10
+CRO_KEEP_DAYS = 400
+CRO_FUNIL_CSV = "historico_cro_funil.csv"
+CRO_ENTRADA_CSV = "historico_cro_entrada.csv"
+CRO_CATEGORIAS_CSV = "historico_cro_categorias.csv"
+CRO_PRODUTOS_CSV = "historico_cro_produtos.csv"
+CRO_CHECKOUT_CSV = "historico_cro_checkout.csv"
+CRO_PEDIDOS_CSV = "historico_cro_ga4_pedidos.csv"
+CRO_FUNIL_COLS = ["sessoes", "viu_produto", "carrinho", "ck_inicio", "ck_dados", "ck_frete", "ck_pagamento",
+                  "concluido", "compras", "receita"]
+# Atencao: NAO filtrar por "cart"/"carrinho" - casa com "carteira" (/produto/carteira-...).
+# Por isso as etapas do checkout usam regex ancorado no inicio do caminho.
+CRO_CHECKOUT_REGEX = [
+    ("ck_inicio", r"^/checkout/[^/]+/?$"),   # RE2 (GA4) nao tem lookahead; /checkout/concluido/<c> tem 2 segmentos e nao casa
+    ("ck_dados", r"^/checkout/[^/]+/personal"),
+    ("ck_frete", r"^/checkout/[^/]+/shipping"),
+    ("ck_pagamento", r"^/checkout/[^/]+/payment"),
+    ("concluido", r"^/checkout/concluido/[^/]+"),
+]
+# etapa de cada caminho de checkout -> bit da mascara (1 inicio, 2 dados, 4 frete, 8 pagamento, 16 concluido)
+CRO_CHECKOUT_PATHS = [
+    (1, re.compile(r"^/checkout/(?!concluido(?:/|$))([^/?]+)/?$")),
+    (2, re.compile(r"^/checkout/([^/?]+)/personal")),
+    (4, re.compile(r"^/checkout/([^/?]+)/shipping")),
+    (8, re.compile(r"^/checkout/([^/?]+)/payment")),
+    (16, re.compile(r"^/checkout/concluido/([^/?]+)")),
+]
+CRO_LANDING_EXCL = r"^/(\?.*)?$|^/produto/|^/checkout|^/busca|^/conta|^/entrar|^/p/|^\(not set\)$"
+
+
+def _ga4_headers_cro():
+    return {"Authorization": f"Bearer {_sa_token('https://www.googleapis.com/auth/analytics.readonly')}",
+            "Content-Type": "application/json"}
+
+
+def _ga4_rows(headers_, body):
+    """runReport paginado (offset/limit). Devolve [(dimensoes[], metricas[])]."""
+    url = f"https://analyticsdata.googleapis.com/v1beta/properties/{GA4_PROPERTY_ID}:runReport"
+    out, offset = [], 0
+    while True:
+        b = dict(body)
+        b["limit"], b["offset"] = 100000, offset
+        data = _urlopen_json_retry(urllib.request.Request(url, data=json.dumps(b).encode(), method="POST", headers=headers_), timeout=120)
+        got = data.get("rows", [])
+        for r in got:
+            out.append(([x["value"] for x in r["dimensionValues"]], [x["value"] for x in r["metricValues"]]))
+        offset += len(got)
+        if not got or offset >= int(data.get("rowCount") or 0):
+            break
+    return out
+
+
+def _f_event(nome):
+    return {"filter": {"fieldName": "eventName", "stringFilter": {"matchType": "EXACT", "value": nome}}}
+
+
+def _f_regex(campo, rx):
+    return {"filter": {"fieldName": campo, "stringFilter": {"matchType": "PARTIAL_REGEXP", "value": rx, "caseSensitive": True}}}
+
+
+def _f_and(*exprs):
+    return {"andGroup": {"expressions": list(exprs)}}
+
+
+def _ga_date(d):
+    return f"{d[:4]}-{d[4:6]}-{d[6:8]}"
+
+
+def _cro_norm_path(p):
+    p = (p or "").split("?")[0].lower()
+    return p.rstrip("/") if len(p) > 1 else (p or "/")
+
+
+def _cro_categoria_slugs():
+    """Slugs de pagina de categoria: tags da VNDA com produtos (fora as tecnicas) + itens de menu."""
+    slugs = set()
+
+    def walk(items):
+        for it in items:
+            u = it.get("url") or ""
+            if u.startswith("/") and not it.get("external"):
+                p = u.split("?")[0].strip("/").split("/")[0]
+                if p:
+                    slugs.add(p)
+            if it.get("tag_name"):
+                slugs.add(it["tag_name"])
+            walk(it.get("children") or [])
+
+    try:
+        walk(fetch_with_retry("https://api.vnda.com.br/api/v2/menus"))
+    except Exception as e:
+        log_line("cro", f"AVISO: menus da VNDA indisponiveis: {type(e).__name__}: {e}")
+    pg = 1
+    while True:
+        data = fetch_with_retry(f"https://api.vnda.com.br/api/v2/tags?per_page=100&page={pg}")
+        if not data:
+            break
+        for t in data:
+            if t.get("type") in SEO_TAG_TYPES_IGNORADOS or not t.get("products_count"):
+                continue
+            if t["name"].endswith("-flag"):
+                continue
+            slugs.add(t["name"])
+        if len(data) < 100:
+            break
+        pg += 1
+        if pg > 10:
+            break
+    return {s.lower() for s in slugs}
+
+
+def _cro_catalogo():
+    """id do produto -> [referencia, nome, estoque_total, {tamanho: estoque}] (so ativos), do estoque por variante."""
+    out = {}
+    for p in fetch_all_products():
+        if not p.get("active"):
+            continue
+        tams, total = {}, 0
+        for grupo in p.get("variants") or []:
+            for v in (grupo.values() if isinstance(grupo, dict) and "id" not in grupo else [grupo]):
+                if not isinstance(v, dict):
+                    continue
+                est = int(v.get("stock") or 0)
+                tam = str(v.get("attribute2") or v.get("name") or "").strip()
+                if tam:
+                    tams[tam] = tams.get(tam, 0) + est
+                total += est
+        out[str(p["id"])] = [p.get("reference") or "", (p.get("name") or "").strip(), total, tams]
+    return out
+
+
+def _cro_merge_csv(nome, header, novas, inicio_iso):
+    path = os.path.join(BASE_DIR, nome)
+    limite = (date.today() - timedelta(days=CRO_KEEP_DAYS)).isoformat()
+    manter = []
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8", newline="") as f:
+            for r in list(csv.reader(f))[1:]:
+                if r and limite <= r[0] < inicio_iso:
+                    manter.append(r)
+    _write_csv_atomic(nome, header, manter + novas)
+    return len(manter) + len(novas)
+
+
+def _cro_min_date(nome):
+    path = os.path.join(BASE_DIR, nome)
+    if not os.path.isfile(path):
+        return None
+    with open(path, encoding="utf-8", newline="") as f:
+        datas = [r[0] for r in list(csv.reader(f))[1:] if r]
+    return min(datas) if datas else None
+
+
+def fetch_cro_data(backfill_days=CRO_BACKFILL_DAYS, refresh_days=CRO_REFRESH_DAYS):
+    hoje = date.today()
+    inicio = hoje - timedelta(days=refresh_days)
+    menor = _cro_min_date(CRO_FUNIL_CSV)
+    if menor is None or menor > (hoje - timedelta(days=backfill_days - 20)).isoformat():
+        inicio = hoje - timedelta(days=backfill_days)
+    ini_iso, fim_iso = inicio.isoformat(), hoje.isoformat()
+    rng = [{"startDate": ini_iso, "endDate": fim_iso}]
+    h = _ga4_headers_cro()
+    dims_base = [{"name": "date"}, {"name": "deviceCategory"}, {"name": "sessionDefaultChannelGroup"}]
+
+    # ---- funil (dia x dispositivo x canal) ----
+    funil = {}
+    for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": dims_base,
+                                "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}]}):
+        k = (_ga_date(dv[0]), dv[1], dv[2])
+        a = funil.setdefault(k, [0] * 10)
+        a[0] = int(mv[0]); a[8] = int(float(mv[1])); a[9] = round(float(mv[2]), 2)
+    etapas = [("viu_produto", _f_event("view_item")), ("carrinho", _f_event("add_to_cart"))]
+    for nome, rx in CRO_CHECKOUT_REGEX:
+        etapas.append((nome, _f_and(_f_event("page_view"), _f_regex("pagePath", rx))))
+    for nome, flt in etapas:
+        idx = CRO_FUNIL_COLS.index(nome)
+        for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": dims_base, "metrics": [{"name": "sessions"}], "dimensionFilter": flt}):
+            k = (_ga_date(dv[0]), dv[1], dv[2])
+            if k in funil:
+                funil[k][idx] = int(mv[0])
+    n_funil = _cro_merge_csv(CRO_FUNIL_CSV, ["data", "dispositivo", "canal"] + CRO_FUNIL_COLS,
+                             [[k[0], k[1], k[2]] + v for k, v in sorted(funil.items())], ini_iso)
+
+    # ---- categorias (landingPage) ----
+    slugs = _cro_categoria_slugs()
+    excl = {"notExpression": _f_regex("landingPage", CRO_LANDING_EXCL)}
+    dims_lp = dims_base + [{"name": "landingPage"}]
+    cats = {}
+
+    def cat_key(dv):
+        path = _cro_norm_path(dv[3])
+        if path == "/" or path.split("/")[1] not in slugs:
+            return None
+        return (_ga_date(dv[0]), dv[1], dv[2], path)
+
+    for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": dims_lp, "dimensionFilter": excl,
+                                "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}]}):
+        k = cat_key(dv)
+        if k:
+            a = cats.setdefault(k, [0, 0, 0, 0, 0.0])
+            a[0] += int(mv[0]); a[3] += int(float(mv[1])); a[4] += float(mv[2])
+    for pos, nome in ((1, "view_item"), (2, "add_to_cart")):
+        for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": dims_lp, "metrics": [{"name": "sessions"}],
+                                    "dimensionFilter": _f_and(_f_event(nome), excl)}):
+            k = cat_key(dv)
+            if k:
+                cats.setdefault(k, [0, 0, 0, 0, 0.0])[pos] += int(mv[0])
+    n_cats = _cro_merge_csv(CRO_CATEGORIAS_CSV, ["data", "dispositivo", "canal", "pagina", "sessoes", "viu_produto", "carrinho", "compras", "receita"],
+                            [[k[0], k[1], k[2], k[3], v[0], v[1], v[2], v[3], round(v[4], 2)] for k, v in sorted(cats.items())], ini_iso)
+
+    # ---- porta de entrada (Home / Categoria / Produto / Outras) ----
+    entrada = {}
+    for tipo, rx in ((0, r"^/(\?.*)?$"), (2, r"^/produto/")):
+        for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": dims_base, "dimensionFilter": _f_regex("landingPage", rx),
+                                    "metrics": [{"name": "sessions"}, {"name": "transactions"}]}):
+            entrada[(_ga_date(dv[0]), dv[1], dv[2], tipo)] = [int(mv[0]), int(float(mv[1]))]
+    for (d, dev, can, _p), v in cats.items():
+        a = entrada.setdefault((d, dev, can, 1), [0, 0])
+        a[0] += v[0]; a[1] += v[3]
+    saida = []
+    for (d, dev, can), v in funil.items():
+        usados = [0, 0]
+        for tipo in (0, 1, 2):
+            e = entrada.get((d, dev, can, tipo), [0, 0])
+            usados[0] += e[0]; usados[1] += e[1]
+            saida.append([d, dev, can, tipo, e[0], e[1]])
+        saida.append([d, dev, can, 3, max(v[0] - usados[0], 0), max(v[8] - usados[1], 0)])
+    saida = [r for r in saida if r[4] or r[5]]
+    saida.sort()
+    n_ent = _cro_merge_csv(CRO_ENTRADA_CSV, ["data", "dispositivo", "canal", "tipo", "sessoes", "compras"], saida, ini_iso)
+
+    # ---- produtos (itemId = id do produto na VNDA) ----
+    prods = {}
+    for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": [{"name": "date"}, {"name": "deviceCategory"}, {"name": "itemId"}],
+                                "metrics": [{"name": "itemsViewed"}, {"name": "itemsAddedToCart"}, {"name": "itemsPurchased"}, {"name": "itemRevenue"}]}):
+        if not dv[2].isdigit():
+            continue
+        a = prods.setdefault((_ga_date(dv[0]), dv[1], dv[2]), [0, 0, 0, 0.0])
+        a[0] += int(float(mv[0])); a[1] += int(float(mv[1])); a[2] += int(float(mv[2])); a[3] += float(mv[3])
+    n_prod = _cro_merge_csv(CRO_PRODUTOS_CSV, ["data", "dispositivo", "produto_id", "views", "carrinho", "compras", "receita"],
+                            [[k[0], k[1], k[2], v[0], v[1], v[2], round(v[3], 2)] for k, v in sorted(prods.items())], ini_iso)
+
+    # ---- checkout por codigo unico ----
+    # Sem filtro de evento e com a metrica sessions: conta o codigo mesmo quando a pagina so teve
+    # eventos como begin_checkout (sem page_view). Reproduz a referencia 28/10-03/11 (275/231/213/191/150).
+    masc = {}
+    for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": dims_base + [{"name": "pagePath"}], "metrics": [{"name": "sessions"}],
+                                "dimensionFilter": {"filter": {"fieldName": "pagePath", "stringFilter": {"matchType": "BEGINS_WITH", "value": "/checkout"}}}}):
+        for bit, rx in CRO_CHECKOUT_PATHS:
+            m = rx.match(dv[3])
+            if m:
+                k = (_ga_date(dv[0]), dv[1], dv[2], m.group(1))
+                masc[k] = masc.get(k, 0) | bit
+                break
+    n_ck = _cro_merge_csv(CRO_CHECKOUT_CSV, ["data", "dispositivo", "canal", "codigo", "mascara"],
+                          [[k[0], k[1], k[2], k[3], v] for k, v in sorted(masc.items())], ini_iso)
+
+    # ---- pedidos no GA4 (transactionId) ----
+    peds = {}
+    for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": [{"name": "date"}, {"name": "transactionId"}],
+                                "metrics": [{"name": "purchaseRevenue"}]}):
+        if dv[1] and dv[1] != "(not set)":
+            k = (_ga_date(dv[0]), dv[1])
+            peds[k] = peds.get(k, 0.0) + float(mv[0])
+    n_ped = _cro_merge_csv(CRO_PEDIDOS_CSV, ["data", "transaction_id", "receita"],
+                           [[k[0], k[1], round(v, 2)] for k, v in sorted(peds.items())], ini_iso)
+
+    cat = {"gerado_em": hoje.isoformat(), "produtos": _cro_catalogo()}
+    save_json("cro_catalogo.json", cat)
+    print(f"[cro] desde {ini_iso}: funil {n_funil} | categorias {n_cats} ({len(slugs)} slugs) | entrada {n_ent} | "
+          f"produtos {n_prod} | checkout {n_ck} | pedidos GA4 {n_ped} | catalogo {len(cat['produtos'])} produtos")
 
 
 # ---------------- PARTE 2H: AUTOMACOES E TRANSMISSOES DE E-MAIL (GA4, via utm_content) ----------------
@@ -2811,6 +3111,25 @@ def build_dashboard_data():
     seo_ga4_paginas = [[r["data"], _pi[r["pagina"]], int(r["sessoes"]), int(r["pedidos"]), float(r["receita"])] for r in _ga]
     seo_catalogo = load_json("seo_catalogo.json", {})
 
+    # ---- CRO: tudo por dia, com dispositivo e canal como indice numerico (arquivo menor) ----
+    _cf, _ce, _cc = _ler_csv("historico_cro_funil.csv"), _ler_csv("historico_cro_entrada.csv"), _ler_csv("historico_cro_categorias.csv")
+    _cp, _ck, _cg = _ler_csv("historico_cro_produtos.csv"), _ler_csv("historico_cro_checkout.csv"), _ler_csv("historico_cro_ga4_pedidos.csv")
+    cro_dispositivos, _cdi = _indexar([r["dispositivo"] for r in _cf + _ce + _cc + _cp + _ck])
+    cro_canais, _cci = _indexar([r["canal"] for r in _cf + _ce + _cc + _ck])
+    cro_funil = [[r["data"], _cdi[r["dispositivo"]], _cci[r["canal"]]] + [int(r[c]) for c in CRO_FUNIL_COLS[:-1]] + [float(r["receita"])] for r in _cf]
+    cro_entrada = [[r["data"], _cdi[r["dispositivo"]], _cci[r["canal"]], int(r["tipo"]), int(r["sessoes"]), int(r["compras"])] for r in _ce]
+    cro_paginas_lista, _cpi = _indexar(r["pagina"] for r in _cc)
+    cro_categorias = [[r["data"], _cdi[r["dispositivo"]], _cci[r["canal"]], _cpi[r["pagina"]], int(r["sessoes"]), int(r["viu_produto"]),
+                       int(r["carrinho"]), int(r["compras"]), float(r["receita"])] for r in _cc]
+    cro_produtos = [[r["data"], _cdi[r["dispositivo"]], int(r["produto_id"]), int(r["views"]), int(r["carrinho"]), int(r["compras"]), float(r["receita"])] for r in _cp]
+    cro_codigos, _cki = _indexar(r["codigo"] for r in _ck)
+    cro_checkout = [[r["data"], _cdi[r["dispositivo"]], _cci[r["canal"]], _cki[r["codigo"]], int(r["mascara"])] for r in _ck]
+    cro_ga4_pedidos = [[r["data"], r["transaction_id"], float(r["receita"])] for r in _cg]
+    _cro_corte = (date.today() - timedelta(days=CRO_BACKFILL_DAYS + 10)).isoformat()
+    cro_vnda_pedidos = [[o["code"], o["date"], o["status"], round(o.get("total") or 0, 2)]
+                        for o in load_json("orders_master.json", []) if o.get("date", "") >= _cro_corte and o.get("code")]
+    cro_catalogo = load_json("cro_catalogo.json", {})
+
     crm_transmissoes_path = os.path.join(BASE_DIR, "historico_crm_transmissoes.csv")
     crm_transmissoes_rows = []
     if os.path.isfile(crm_transmissoes_path):
@@ -2969,6 +3288,18 @@ def build_dashboard_data():
         "seo_ga4_paginas": seo_ga4_paginas,
         "seo_catalogo": seo_catalogo,
         "seo_mercado": load_json("seo_mercado.json", {}),
+        "cro_dispositivos": cro_dispositivos,
+        "cro_canais": cro_canais,
+        "cro_funil": cro_funil,
+        "cro_entrada": cro_entrada,
+        "cro_paginas_lista": cro_paginas_lista,
+        "cro_categorias": cro_categorias,
+        "cro_produtos": cro_produtos,
+        "cro_codigos": cro_codigos,
+        "cro_checkout": cro_checkout,
+        "cro_ga4_pedidos": cro_ga4_pedidos,
+        "cro_vnda_pedidos": cro_vnda_pedidos,
+        "cro_catalogo": cro_catalogo,
         "crm_automacoes_rows": crm_automacoes_rows,
         "crm_transmissoes_rows": crm_transmissoes_rows,
         "stock_sku": stock_sku,
