@@ -308,20 +308,20 @@ tbody tr:last-child td{border-bottom:none;}
 .emptystate{padding:2rem; text-align:center; color:var(--text-muted); font-size:13px;}
 .footnote{font-size:11px; color:var(--text-muted); margin-top:1rem;}
 
-.cro-funnel{display:flex; flex-direction:column; gap:10px; margin-bottom:1rem;}
-.cro-step{display:grid; grid-template-columns:190px 1fr 120px 150px; gap:14px; align-items:center;}
-.cro-step .lbl{font-size:13px; font-weight:600;}
-.cro-bar{height:28px; background:var(--accent-bg); border-radius:6px; overflow:hidden;}
-.cro-bar>span{display:block; height:100%; background:var(--accent); border-radius:6px; min-width:2px;}
-.cro-step .val{text-align:right; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums;}
-.cro-step .nxt{font-size:12px; color:var(--text-secondary); font-variant-numeric:tabular-nums;}
+.cro-funnel{display:flex; flex-direction:column; gap:2px; margin-bottom:1rem;}
+.cro-frow{display:grid; grid-template-columns:190px minmax(180px,1fr) 120px 150px; gap:14px; align-items:center; min-height:58px;}
+.cro-fl .lbl{font-size:13px; font-weight:600;}
+.cro-fshape{height:58px; min-width:0;}
+.cro-fshape svg{display:block; width:100%; height:100%;}
+.cro-frow .val{text-align:right; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums;}
+.cro-frow .nxt{font-size:12px; color:var(--text-secondary); font-variant-numeric:tabular-nums;}
 .cro-sub{font-size:11px; font-weight:400; margin-top:1px;}
 .cro-sub .delta{font-size:11px;}
 .cro-tams{display:flex; gap:3px; flex-wrap:wrap;}
 .cro-tam{font-size:11px; font-weight:600; padding:1px 6px; border-radius:4px; font-variant-numeric:tabular-nums;}
 .cro-tam.ok{background:var(--good-bg); color:var(--good-ink);}
 .cro-tam.no{background:var(--crit-bg); color:var(--crit-ink); text-decoration:line-through;}
-@media (max-width:720px){ .cro-step{grid-template-columns:1fr 1fr;} .cro-bar{grid-column:1/-1; order:3;} }
+@media (max-width:720px){ .cro-frow{grid-template-columns:1fr 1fr;} .cro-fshape{grid-column:1/-1; order:3; height:46px;} }
 
 .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:1.25rem;}
 .cal-dow{font-size:11px; color:var(--text-muted); text-align:center; padding:4px 0; text-transform:uppercase; letter-spacing:.04em;}
@@ -1237,6 +1237,14 @@ tbody tr:last-child td{border-bottom:none;}
 
     <div class="section-title">Funil principal, em sessões</div>
     <p class="footnote" style="margin-top:-6px;">Cada etapa conta sessões que tiveram o evento ou a página. O percentual ao lado mostra quantas seguiram para a etapa seguinte, e a seta compara com o período anterior. O checkout não é estritamente linear: quem usa endereço salvo ou retirada na loja pula o Frete, então Pagamento pode superar Frete.</p>
+    <div class="controls-row">
+      <span class="hint" style="margin-left:0;">Largura da forma</span>
+      <div class="seg" id="seg-cro-escala">
+        <button aria-pressed="true" data-v="suave">Suavizada</button>
+        <button aria-pressed="false" data-v="real">Proporcional</button>
+      </div>
+      <span class="hint" style="margin-left:0;">Suavizada usa a raiz quadrada para as etapas finais não sumirem. Os números ao lado são sempre os reais.</span>
+    </div>
     <div class="cro-funnel" id="cro-funil-steps"></div>
 
     <div class="section-title" style="margin-top:1.5rem;">Sessões e conversão por dia</div>
@@ -1283,6 +1291,13 @@ tbody tr:last-child td{border-bottom:none;}
     <div class="kpirow" id="cro-ck-kpirow"></div>
     <div class="section-title">Funil do checkout, em checkouts únicos</div>
     <p class="footnote" style="margin-top:-6px;">Cada URL de checkout traz um código próprio. Aqui as URLs são agrupadas por código e cada checkout conta uma vez, na etapa mais avançada que chegou: quem pulou uma etapa conta como tendo passado pelas anteriores.</p>
+    <div class="controls-row">
+      <span class="hint" style="margin-left:0;">Largura da forma</span>
+      <div class="seg" id="seg-cro-escala-ck">
+        <button aria-pressed="true" data-v="suave">Suavizada</button>
+        <button aria-pressed="false" data-v="real">Proporcional</button>
+      </div>
+    </div>
     <div class="cro-funnel" id="cro-ck-steps"></div>
     <p class="footnote" id="cro-ck-nota"></p>
   </div>
@@ -3704,6 +3719,7 @@ const croCatalogo = (DATA.cro_catalogo || {}).produtos || {}; // id -> [referenc
 const croDatas = Array.from(new Set(croFunil.map(r=>r[0]))).sort();
 const croMin = croDatas[0] || '', croMax = croDatas[croDatas.length-1] || '';
 const croHasData = croDatas.length > 0;
+const croViuDesde = (croFunil.find(r=>r[4]>0) || [])[0] || '';  // primeiro dia com view_item (funil esta ordenado por data)
 // o GA4 reprocessa a atribuicao nos ultimos 2 dias: esses dias aparecem como provisorios
 const croProv = new Set(croDatas.slice(-2));
 const CRO_DISP_LABEL = {mobile:'Celular', desktop:'Computador', tablet:'Tablet', 'smart tv':'Smart TV'};
@@ -3714,15 +3730,26 @@ const CRO_TIPOS = ['Home','Categoria','Produto','Outras'];
 (function croSetupFilters(){
   const d = document.getElementById('cro-dispositivo'), c = document.getElementById('cro-canal');
   d.innerHTML = '<option value="all">Todos</option>' + croDisp.map((x,i)=>`<option value="${i}">${seoEsc(CRO_DISP_LABEL[x] || x)}</option>`).join('');
-  c.innerHTML = '<option value="all">Todos</option>' + croCan.map((x,i)=>`<option value="${i}">${seoEsc(x)}</option>`).join('');
+  const ordem = ['Direto','Orgânico','E-mail','Referral/Social','__paga__','Google (mídia paga)','Face (mídia paga)','TikTok (mídia paga)','Outros'];
+  let ops = '<option value="all">Todos</option>';
+  ordem.forEach(n=>{
+    if(n==='__paga__'){ if(croCan.some(x=>/mídia paga/.test(x))) ops += '<option value="paga">Mídia paga (todas)</option>'; return; }
+    const i = croCan.indexOf(n);
+    if(i>=0) ops += `<option value="${i}">${seoEsc(n)}</option>`;
+  });
+  croCan.forEach((x,i)=>{ if(!ordem.includes(x)) ops += `<option value="${i}">${seoEsc(x)}</option>`; });
+  c.innerHTML = ops;
 })();
 
 function croSel(){
   const d = document.getElementById('cro-dispositivo').value, c = document.getElementById('cro-canal').value;
-  return {d: d==='all' ? -1 : +d, c: c==='all' ? -1 : +c};
+  let cs = null;
+  if(c==='paga') cs = new Set(croCan.map((x,i)=>/mídia paga/.test(x) ? i : -1).filter(i=>i>=0));
+  else if(c!=='all') cs = new Set([+c]);
+  return {d: d==='all' ? -1 : +d, cs};
 }
 function croPass(r, f, usaCanal){
-  return (f.d<0 || r[1]===f.d) && (usaCanal===false || f.c<0 || r[2]===f.c);
+  return (f.d<0 || r[1]===f.d) && (usaCanal===false || f.cs===null || f.cs.has(r[2]));
 }
 function croPrev(start, end){
   const dur = dayDiff(start, end) + 1, pe = addDays(start, -1);
@@ -3772,7 +3799,9 @@ function croAtualizaAviso(start, end){
   const sub = croAtivo();
   const filtros = sub==='produtos' ? 'O filtro de canal não se aplica a esta tabela.'
                 : (sub==='conferencia' ? 'Os filtros de dispositivo e canal não se aplicam a esta aba.' : '');
-  document.getElementById('cro-notice').innerHTML =
+  const semViu = croViuDesde && start < croViuDesde ? `O evento view_item só existe no GA4 a partir de ${croFmtBR(croViuDesde)}: antes disso "Viu produto" aparece zerado. ` : '';
+  document.getElementById('cro-notice').innerHTML = semViu +
+    'Canais seguem a regra da planilha de acompanhamento (origem/mídia da sessão). ' +
     (prov.length ? `<span class="badge badge-orange">Dados provisórios</span> ${prov.map(croFmtBR).join(' e ')}: o GA4 ainda reprocessa a atribuição nos últimos 2 dias, então esses números podem mudar. ` : '') + filtros;
   document.getElementById('cro-compare-hint').textContent = comparePeriodText(start, end);
 }
@@ -3786,19 +3815,27 @@ function croFunilAgg(start, end, f){
   }
   return a; // 0..7 etapas, 8 compras, 9 receita
 }
+let croEscala = 'suave';   // largura da forma: 'suave' (raiz quadrada) ou 'real' (proporcional)
+function croLargura(v, base){
+  if(!(base>0) || !(v>0)) return 0;
+  const r = v / base;
+  return Math.max((croEscala==='real' ? r : Math.sqrt(r)) * 100, 4);
+}
 function croFunnelHTML(vals, prevVals, labels, mostraBase){
-  const base = vals[0] || 0;
+  const base = vals[0] || 0, n = labels.length;
+  const larg = vals.slice(0, n).map(v=>croLargura(v, base));
   return labels.map((nome, i)=>{
     const v = vals[i], p = prevVals[i];
-    const w = base>0 ? Math.max(v/base*100, v>0 ? 1.5 : 0) : 0;
-    const ultimo = i === labels.length-1;
+    const ultimo = i === n-1;
     const seguiu = !ultimo && v>0 ? vals[i+1]/v*100 : null;
     const seguiuPrev = !ultimo && p>0 ? prevVals[i+1]/p*100 : null;
-    return `<div class="cro-step">
-      <div><div class="lbl">${nome}</div><div class="pname">${i===0 && mostraBase ? '100% das sessões' : fmtPctPlain(croPct(v, base)) + (mostraBase ? ' das sessões' : ' dos checkouts iniciados')}</div></div>
-      <div class="cro-bar"><span style="width:${w}%"></span></div>
+    const top = larg[i], bot = ultimo ? top*0.82 : larg[i+1];
+    const pts = `${50-top/2},0 ${50+top/2},0 ${50+bot/2},100 ${50-bot/2},100`;
+    return `<div class="cro-frow">
+      <div class="cro-fl"><div class="lbl">${nome}</div><div class="pname">${i===0 && mostraBase ? '100% das sessões' : fmtPctPlain(croPct(v, base)) + (mostraBase ? ' das sessões' : ' dos checkouts iniciados')}</div></div>
+      <div class="cro-fshape"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="${pts}" fill="var(--accent)" fill-opacity="${(1 - i*0.085).toFixed(3)}"/></svg></div>
       <div class="val">${fmtInt.format(v)}${croDeltaRel(v, p)}</div>
-      <div class="nxt">${ultimo ? '' : '→ ' + fmtPctPlain(seguiu||0) + ' seguiram'}${ultimo || seguiu==null ? '' : croDeltaPP(seguiu, seguiuPrev)}</div>
+      <div class="nxt">${ultimo ? '' : '&#8595; ' + fmtPctPlain(seguiu||0) + ' seguiram'}${ultimo || seguiu==null ? '' : croDeltaPP(seguiu, seguiuPrev)}</div>
     </div>`;
   }).join('');
 }
@@ -4124,6 +4161,11 @@ if(croHasData){
   [croStartInput, croEndInput].forEach(el=>el.addEventListener('change', ()=>{ croDesmarcaAtalho(); renderCroAll(); }));
   [document.getElementById('cro-dispositivo'), document.getElementById('cro-canal'), document.getElementById('cro-prod-filtro')].forEach(el=>el.addEventListener('change', renderCroAll));
   [document.getElementById('cro-cat-texto'), document.getElementById('cro-prod-texto')].forEach(el=>el.addEventListener('input', renderCroAll));
+  ['seg-cro-escala','seg-cro-escala-ck'].forEach(id=>seg(id, v=>{
+    croEscala = v;
+    ['seg-cro-escala','seg-cro-escala-ck'].forEach(o=>document.querySelectorAll('#'+o+' button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.v===v ? 'true' : 'false')));
+    renderCroAll();
+  }));
   seg('seg-cro-atalho', v=>{
     const dias = +v, y = croYesterday();
     let s = dias===1 ? y : addDays(y, -(dias-1));

@@ -1162,6 +1162,33 @@ CRO_CHECKOUT_PATHS = [
 CRO_LANDING_EXCL = r"^/(\?.*)?$|^/produto/|^/checkout|^/busca|^/conta|^/entrar|^/p/|^\(not set\)$"
 
 
+# Canal = regra da planilha de acompanhamento (aba do mes, linhas "Trafego por canal"): origem/midia da
+# sessao. Conferida contra a aba Out de outubro (dias 1 a 19): Direto, Organico, E-mail e Referral/Social
+# batem exatamente; Google e Face variam em +-1 a 3 sessoes (reprocessamento do GA4).
+CRO_META_ORIGENS = {"facebook / cpc", "instagram / cpc", "ig / paid", "metaads / paid"}
+CRO_CANAIS_ORDEM = ["Direto", "Orgânico", "E-mail", "Referral/Social", "Google (mídia paga)", "Face (mídia paga)",
+                    "TikTok (mídia paga)", "Outros"]
+
+
+def _cro_canal(origem_midia, grupo):
+    s = (origem_midia or "").lower()
+    if s == "google / cpc":
+        return "Google (mídia paga)"
+    if "tiktok" in s:
+        return "TikTok (mídia paga)"
+    if s in CRO_META_ORIGENS or grupo == "Paid Social":
+        return "Face (mídia paga)"
+    if "direct" in s:
+        return "Direto"
+    if "organic" in s:
+        return "Orgânico"
+    if "mail" in s or "whats" in s:
+        return "E-mail"
+    if re.search(r"referral|social", s):
+        return "Referral/Social"
+    return "Outros"
+
+
 def _ga4_headers_cro():
     return {"Authorization": f"Bearer {_sa_token('https://www.googleapis.com/auth/analytics.readonly')}",
             "Content-Type": "application/json"}
@@ -1281,7 +1308,10 @@ def _cro_min_date(nome):
     if not os.path.isfile(path):
         return None
     with open(path, encoding="utf-8", newline="") as f:
-        datas = [r[0] for r in list(csv.reader(f))[1:] if r]
+        linhas = list(csv.reader(f))
+    if not linhas or "canal_planilha" not in linhas[0]:
+        return None  # esquema antigo (canal = grupo padrao do GA4): refaz o historico
+    datas = [r[0] for r in linhas[1:] if r]
     return min(datas) if datas else None
 
 
@@ -1294,26 +1324,28 @@ def fetch_cro_data(backfill_days=CRO_BACKFILL_DAYS, refresh_days=CRO_REFRESH_DAY
     ini_iso, fim_iso = inicio.isoformat(), hoje.isoformat()
     rng = [{"startDate": ini_iso, "endDate": fim_iso}]
     h = _ga4_headers_cro()
-    dims_base = [{"name": "date"}, {"name": "deviceCategory"}, {"name": "sessionDefaultChannelGroup"}]
+    dims_base = [{"name": "date"}, {"name": "deviceCategory"}, {"name": "sessionSourceMedium"}, {"name": "sessionDefaultChannelGroup"}]
+
+    def chave(dv):
+        return (_ga_date(dv[0]), dv[1], _cro_canal(dv[2], dv[3]))
 
     # ---- funil (dia x dispositivo x canal) ----
     funil = {}
     for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": dims_base,
                                 "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}]}):
-        k = (_ga_date(dv[0]), dv[1], dv[2])
-        a = funil.setdefault(k, [0] * 10)
-        a[0] = int(mv[0]); a[8] = int(float(mv[1])); a[9] = round(float(mv[2]), 2)
+        a = funil.setdefault(chave(dv), [0] * 10)
+        a[0] += int(mv[0]); a[8] += int(float(mv[1])); a[9] += float(mv[2])
     etapas = [("viu_produto", _f_event("view_item")), ("carrinho", _f_event("add_to_cart"))]
     for nome, rx in CRO_CHECKOUT_REGEX:
         etapas.append((nome, _f_and(_f_event("page_view"), _f_regex("pagePath", rx))))
     for nome, flt in etapas:
         idx = CRO_FUNIL_COLS.index(nome)
         for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": dims_base, "metrics": [{"name": "sessions"}], "dimensionFilter": flt}):
-            k = (_ga_date(dv[0]), dv[1], dv[2])
+            k = chave(dv)
             if k in funil:
-                funil[k][idx] = int(mv[0])
-    n_funil = _cro_merge_csv(CRO_FUNIL_CSV, ["data", "dispositivo", "canal"] + CRO_FUNIL_COLS,
-                             [[k[0], k[1], k[2]] + v for k, v in sorted(funil.items())], ini_iso)
+                funil[k][idx] += int(mv[0])
+    n_funil = _cro_merge_csv(CRO_FUNIL_CSV, ["data", "dispositivo", "canal_planilha"] + CRO_FUNIL_COLS,
+                             [[k[0], k[1], k[2]] + v[:9] + [round(v[9], 2)] for k, v in sorted(funil.items())], ini_iso)
 
     # ---- categorias (landingPage) ----
     slugs = _cro_categoria_slugs()
@@ -1322,10 +1354,10 @@ def fetch_cro_data(backfill_days=CRO_BACKFILL_DAYS, refresh_days=CRO_REFRESH_DAY
     cats = {}
 
     def cat_key(dv):
-        path = _cro_norm_path(dv[3])
+        path = _cro_norm_path(dv[4])
         if path == "/" or path.split("/")[1] not in slugs:
             return None
-        return (_ga_date(dv[0]), dv[1], dv[2], path)
+        return chave(dv) + (path,)
 
     for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": dims_lp, "dimensionFilter": excl,
                                 "metrics": [{"name": "sessions"}, {"name": "transactions"}, {"name": "purchaseRevenue"}]}):
@@ -1339,7 +1371,7 @@ def fetch_cro_data(backfill_days=CRO_BACKFILL_DAYS, refresh_days=CRO_REFRESH_DAY
             k = cat_key(dv)
             if k:
                 cats.setdefault(k, [0, 0, 0, 0, 0.0])[pos] += int(mv[0])
-    n_cats = _cro_merge_csv(CRO_CATEGORIAS_CSV, ["data", "dispositivo", "canal", "pagina", "sessoes", "viu_produto", "carrinho", "compras", "receita"],
+    n_cats = _cro_merge_csv(CRO_CATEGORIAS_CSV, ["data", "dispositivo", "canal_planilha", "pagina", "sessoes", "viu_produto", "carrinho", "compras", "receita"],
                             [[k[0], k[1], k[2], k[3], v[0], v[1], v[2], v[3], round(v[4], 2)] for k, v in sorted(cats.items())], ini_iso)
 
     # ---- porta de entrada (Home / Categoria / Produto / Outras) ----
@@ -1347,7 +1379,8 @@ def fetch_cro_data(backfill_days=CRO_BACKFILL_DAYS, refresh_days=CRO_REFRESH_DAY
     for tipo, rx in ((0, r"^/(\?.*)?$"), (2, r"^/produto/")):
         for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": dims_base, "dimensionFilter": _f_regex("landingPage", rx),
                                     "metrics": [{"name": "sessions"}, {"name": "transactions"}]}):
-            entrada[(_ga_date(dv[0]), dv[1], dv[2], tipo)] = [int(mv[0]), int(float(mv[1]))]
+            a = entrada.setdefault(chave(dv) + (tipo,), [0, 0])
+            a[0] += int(mv[0]); a[1] += int(float(mv[1]))
     for (d, dev, can, _p), v in cats.items():
         a = entrada.setdefault((d, dev, can, 1), [0, 0])
         a[0] += v[0]; a[1] += v[3]
@@ -1361,7 +1394,7 @@ def fetch_cro_data(backfill_days=CRO_BACKFILL_DAYS, refresh_days=CRO_REFRESH_DAY
         saida.append([d, dev, can, 3, max(v[0] - usados[0], 0), max(v[8] - usados[1], 0)])
     saida = [r for r in saida if r[4] or r[5]]
     saida.sort()
-    n_ent = _cro_merge_csv(CRO_ENTRADA_CSV, ["data", "dispositivo", "canal", "tipo", "sessoes", "compras"], saida, ini_iso)
+    n_ent = _cro_merge_csv(CRO_ENTRADA_CSV, ["data", "dispositivo", "canal_planilha", "tipo", "sessoes", "compras"], saida, ini_iso)
 
     # ---- produtos (itemId = id do produto na VNDA) ----
     prods = {}
@@ -1381,12 +1414,12 @@ def fetch_cro_data(backfill_days=CRO_BACKFILL_DAYS, refresh_days=CRO_REFRESH_DAY
     for dv, mv in _ga4_rows(h, {"dateRanges": rng, "dimensions": dims_base + [{"name": "pagePath"}], "metrics": [{"name": "sessions"}],
                                 "dimensionFilter": {"filter": {"fieldName": "pagePath", "stringFilter": {"matchType": "BEGINS_WITH", "value": "/checkout"}}}}):
         for bit, rx in CRO_CHECKOUT_PATHS:
-            m = rx.match(dv[3])
+            m = rx.match(dv[4])
             if m:
-                k = (_ga_date(dv[0]), dv[1], dv[2], m.group(1))
+                k = chave(dv) + (m.group(1),)
                 masc[k] = masc.get(k, 0) | bit
                 break
-    n_ck = _cro_merge_csv(CRO_CHECKOUT_CSV, ["data", "dispositivo", "canal", "codigo", "mascara"],
+    n_ck = _cro_merge_csv(CRO_CHECKOUT_CSV, ["data", "dispositivo", "canal_planilha", "codigo", "mascara"],
                           [[k[0], k[1], k[2], k[3], v] for k, v in sorted(masc.items())], ini_iso)
 
     # ---- pedidos no GA4 (transactionId) ----
@@ -3114,16 +3147,20 @@ def build_dashboard_data():
     # ---- CRO: tudo por dia, com dispositivo e canal como indice numerico (arquivo menor) ----
     _cf, _ce, _cc = _ler_csv("historico_cro_funil.csv"), _ler_csv("historico_cro_entrada.csv"), _ler_csv("historico_cro_categorias.csv")
     _cp, _ck, _cg = _ler_csv("historico_cro_produtos.csv"), _ler_csv("historico_cro_checkout.csv"), _ler_csv("historico_cro_ga4_pedidos.csv")
+    for _lin in (_cf, _ce, _cc, _ck):  # CSV do esquema antigo (coluna "canal") ate o proximo backfill
+        for _r in _lin:
+            if "canal_planilha" not in _r:
+                _r["canal_planilha"] = _r.get("canal", "Outros")
     cro_dispositivos, _cdi = _indexar([r["dispositivo"] for r in _cf + _ce + _cc + _cp + _ck])
-    cro_canais, _cci = _indexar([r["canal"] for r in _cf + _ce + _cc + _ck])
-    cro_funil = [[r["data"], _cdi[r["dispositivo"]], _cci[r["canal"]]] + [int(r[c]) for c in CRO_FUNIL_COLS[:-1]] + [float(r["receita"])] for r in _cf]
-    cro_entrada = [[r["data"], _cdi[r["dispositivo"]], _cci[r["canal"]], int(r["tipo"]), int(r["sessoes"]), int(r["compras"])] for r in _ce]
+    cro_canais, _cci = _indexar([r["canal_planilha"] for r in _cf + _ce + _cc + _ck])
+    cro_funil = [[r["data"], _cdi[r["dispositivo"]], _cci[r["canal_planilha"]]] + [int(r[c]) for c in CRO_FUNIL_COLS[:-1]] + [float(r["receita"])] for r in _cf]
+    cro_entrada = [[r["data"], _cdi[r["dispositivo"]], _cci[r["canal_planilha"]], int(r["tipo"]), int(r["sessoes"]), int(r["compras"])] for r in _ce]
     cro_paginas_lista, _cpi = _indexar(r["pagina"] for r in _cc)
-    cro_categorias = [[r["data"], _cdi[r["dispositivo"]], _cci[r["canal"]], _cpi[r["pagina"]], int(r["sessoes"]), int(r["viu_produto"]),
+    cro_categorias = [[r["data"], _cdi[r["dispositivo"]], _cci[r["canal_planilha"]], _cpi[r["pagina"]], int(r["sessoes"]), int(r["viu_produto"]),
                        int(r["carrinho"]), int(r["compras"]), float(r["receita"])] for r in _cc]
     cro_produtos = [[r["data"], _cdi[r["dispositivo"]], int(r["produto_id"]), int(r["views"]), int(r["carrinho"]), int(r["compras"]), float(r["receita"])] for r in _cp]
     cro_codigos, _cki = _indexar(r["codigo"] for r in _ck)
-    cro_checkout = [[r["data"], _cdi[r["dispositivo"]], _cci[r["canal"]], _cki[r["codigo"]], int(r["mascara"])] for r in _ck]
+    cro_checkout = [[r["data"], _cdi[r["dispositivo"]], _cci[r["canal_planilha"]], _cki[r["codigo"]], int(r["mascara"])] for r in _ck]
     cro_ga4_pedidos = [[r["data"], r["transaction_id"], float(r["receita"])] for r in _cg]
     _cro_corte = (date.today() - timedelta(days=CRO_BACKFILL_DAYS + 10)).isoformat()
     cro_vnda_pedidos = [[o["code"], o["date"], o["status"], round(o.get("total") or 0, 2)]
