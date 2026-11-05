@@ -1236,15 +1236,9 @@ tbody tr:last-child td{border-bottom:none;}
     <div class="kpirow" id="cro-kpirow"></div>
 
     <div class="section-title">Funil principal, em sessões</div>
-    <p class="footnote" style="margin-top:-6px;">Cada etapa conta sessões que tiveram o evento ou a página. O percentual ao lado mostra quantas seguiram para a etapa seguinte, e a seta compara com o período anterior. O checkout não é estritamente linear: quem usa endereço salvo ou retirada na loja pula o Frete, então Pagamento pode superar Frete.</p>
-    <div class="controls-row">
-      <span class="hint" style="margin-left:0;">Largura da forma</span>
-      <div class="seg" id="seg-cro-escala">
-        <button aria-pressed="true" data-v="suave">Suavizada</button>
-        <button aria-pressed="false" data-v="real">Proporcional</button>
-      </div>
-      <span class="hint" style="margin-left:0;">Suavizada usa a raiz quadrada para as etapas finais não sumirem. Os números ao lado são sempre os reais.</span>
-    </div>
+    <p class="footnote" style="margin-top:-6px;">Cada etapa conta sessões que tiveram o evento ou a página. O desenho do funil é só visual: o tamanho não acompanha os números, a cor sim. O percentual ao lado mostra quantas seguiram para a etapa seguinte, e a seta compara com o período anterior. O checkout não é estritamente linear: quem usa endereço salvo ou retirada na loja pula o Frete, então Pagamento pode superar Frete.</p>
+    <div class="legend"><span class="sw"><span class="dot" style="background:hsl(215 50% 18%)"></span>mais escuro: menos sessões e menor % de conversão</span><span class="sw"><span class="dot" style="background:hsl(215 70% 38%)"></span>igual ao período anterior</span><span class="sw"><span class="dot" style="background:hsl(215 90% 58%)"></span>mais vivo: mais sessões e maior % de conversão</span></div>
+    <p class="footnote" style="margin:0 0 10px;">A cor de cada etapa compara com o período anterior o volume de sessões e o % que seguiu para a etapa seguinte. Mais vivo = melhorou nos dois, mais escuro = piorou nos dois. Na última etapa só o volume conta.</p>
     <div class="cro-funnel" id="cro-funil-steps"></div>
 
     <div class="section-title" style="margin-top:1.5rem;">Sessões e conversão por dia</div>
@@ -1291,13 +1285,8 @@ tbody tr:last-child td{border-bottom:none;}
     <div class="kpirow" id="cro-ck-kpirow"></div>
     <div class="section-title">Funil do checkout, em checkouts únicos</div>
     <p class="footnote" style="margin-top:-6px;">Cada URL de checkout traz um código próprio. Aqui as URLs são agrupadas por código e cada checkout conta uma vez, na etapa mais avançada que chegou: quem pulou uma etapa conta como tendo passado pelas anteriores.</p>
-    <div class="controls-row">
-      <span class="hint" style="margin-left:0;">Largura da forma</span>
-      <div class="seg" id="seg-cro-escala-ck">
-        <button aria-pressed="true" data-v="suave">Suavizada</button>
-        <button aria-pressed="false" data-v="real">Proporcional</button>
-      </div>
-    </div>
+    <div class="legend"><span class="sw"><span class="dot" style="background:hsl(215 50% 18%)"></span>mais escuro: menos sessões e menor % de conversão</span><span class="sw"><span class="dot" style="background:hsl(215 70% 38%)"></span>igual ao período anterior</span><span class="sw"><span class="dot" style="background:hsl(215 90% 58%)"></span>mais vivo: mais sessões e maior % de conversão</span></div>
+    <p class="footnote" style="margin:0 0 10px;">A cor de cada etapa compara com o período anterior o volume de sessões e o % que seguiu para a etapa seguinte. Mais vivo = melhorou nos dois, mais escuro = piorou nos dois. Na última etapa só o volume conta.</p>
     <div class="cro-funnel" id="cro-ck-steps"></div>
     <p class="footnote" id="cro-ck-nota"></p>
   </div>
@@ -3727,25 +3716,26 @@ const CRO_ETAPAS = ['Sessões','Viu produto','Adicionou ao carrinho','Início do
 const CRO_CK_ETAPAS = ['Início do checkout','Dados pessoais','Frete','Pagamento','Pedido concluído'];
 const CRO_TIPOS = ['Home','Categoria','Produto','Outras'];
 
+const CRO_CANAL_FILTRO = [
+  {v:'direto',   label:'Direto',     match:n=>n==='Direto'},
+  {v:'email',    label:'E-mail',     match:n=>n==='E-mail'},
+  {v:'paga',     label:'Mídia paga', match:n=>/mídia paga/.test(n)},
+  {v:'organico', label:'Orgânico',   match:n=>n==='Orgânico'},
+  {v:'referral', label:'Referral',   match:n=>n==='Referral/Social'},
+];
 (function croSetupFilters(){
   const d = document.getElementById('cro-dispositivo'), c = document.getElementById('cro-canal');
   d.innerHTML = '<option value="all">Todos</option>' + croDisp.map((x,i)=>`<option value="${i}">${seoEsc(CRO_DISP_LABEL[x] || x)}</option>`).join('');
-  const ordem = ['Direto','Orgânico','E-mail','Referral/Social','__paga__','Google (mídia paga)','Face (mídia paga)','TikTok (mídia paga)','Outros'];
-  let ops = '<option value="all">Todos</option>';
-  ordem.forEach(n=>{
-    if(n==='__paga__'){ if(croCan.some(x=>/mídia paga/.test(x))) ops += '<option value="paga">Mídia paga (todas)</option>'; return; }
-    const i = croCan.indexOf(n);
-    if(i>=0) ops += `<option value="${i}">${seoEsc(n)}</option>`;
-  });
-  croCan.forEach((x,i)=>{ if(!ordem.includes(x)) ops += `<option value="${i}">${seoEsc(x)}</option>`; });
-  c.innerHTML = ops;
+  // Canais pela regra da planilha, em ordem alfabetica. "Mídia paga" reune Google, Face e TikTok.
+  const ops = ['<option value="all">Todos</option>'].concat(CRO_CANAL_FILTRO.map(o=>`<option value="${o.v}">${o.label}</option>`));
+  c.innerHTML = ops.join('');
 })();
 
 function croSel(){
   const d = document.getElementById('cro-dispositivo').value, c = document.getElementById('cro-canal').value;
   let cs = null;
-  if(c==='paga') cs = new Set(croCan.map((x,i)=>/mídia paga/.test(x) ? i : -1).filter(i=>i>=0));
-  else if(c!=='all') cs = new Set([+c]);
+  const o = CRO_CANAL_FILTRO.find(x=>x.v===c);
+  if(o) cs = new Set(croCan.map((n,i)=>o.match(n) ? i : -1).filter(i=>i>=0));
   return {d: d==='all' ? -1 : +d, cs};
 }
 function croPass(r, f, usaCanal){
@@ -3815,25 +3805,36 @@ function croFunilAgg(start, end, f){
   }
   return a; // 0..7 etapas, 8 compras, 9 receita
 }
-let croEscala = 'suave';   // largura da forma: 'suave' (raiz quadrada) ou 'real' (proporcional)
-function croLargura(v, base){
-  if(!(base>0) || !(v>0)) return 0;
-  const r = v / base;
-  return Math.max((croEscala==='real' ? r : Math.sqrt(r)) * 100, 4);
+// Forma estatica: so representa as etapas, a largura nao depende dos numeros (que ficam ao lado).
+function croLargura(i, n){
+  return 100 - (100 - 34) * i / n;
+}
+// Cor da etapa: azul que fica mais vivo quando a etapa melhora e mais escuro quando piora, em relacao ao
+// periodo anterior. Junta dois sinais: o volume de sessoes (satura em +-30%) e o % que seguiu para a
+// etapa seguinte (satura em +-5 p.p.); na ultima etapa so existe o volume.
+function croScore(v, p, seguiu, seguiuPrev){
+  const clamp = x => Math.max(-1, Math.min(1, x));
+  const parts = [];
+  if(p>0) parts.push(clamp((v-p)/p*100/30));
+  if(seguiu!=null && seguiuPrev!=null) parts.push(clamp((seguiu-seguiuPrev)/5));
+  return parts.length ? parts.reduce((x,y)=>x+y,0)/parts.length : 0;
+}
+function croAzul(score){
+  return `hsl(215 ${Math.round(70+20*score)}% ${Math.round(38+20*score)}%)`;
 }
 function croFunnelHTML(vals, prevVals, labels, mostraBase){
   const base = vals[0] || 0, n = labels.length;
-  const larg = vals.slice(0, n).map(v=>croLargura(v, base));
   return labels.map((nome, i)=>{
     const v = vals[i], p = prevVals[i];
     const ultimo = i === n-1;
     const seguiu = !ultimo && v>0 ? vals[i+1]/v*100 : null;
     const seguiuPrev = !ultimo && p>0 ? prevVals[i+1]/p*100 : null;
-    const top = larg[i], bot = ultimo ? top*0.82 : larg[i+1];
+    const top = croLargura(i, n), bot = croLargura(i+1, n);
     const pts = `${50-top/2},0 ${50+top/2},0 ${50+bot/2},100 ${50-bot/2},100`;
+    const cor = croAzul(croScore(v, p, seguiu, seguiuPrev));
     return `<div class="cro-frow">
       <div class="cro-fl"><div class="lbl">${nome}</div><div class="pname">${i===0 && mostraBase ? '100% das sessões' : fmtPctPlain(croPct(v, base)) + (mostraBase ? ' das sessões' : ' dos checkouts iniciados')}</div></div>
-      <div class="cro-fshape"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="${pts}" fill="var(--accent)" fill-opacity="${(1 - i*0.085).toFixed(3)}"/></svg></div>
+      <div class="cro-fshape"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon points="${pts}" fill="${cor}"/></svg></div>
       <div class="val">${fmtInt.format(v)}${croDeltaRel(v, p)}</div>
       <div class="nxt">${ultimo ? '' : '&#8595; ' + fmtPctPlain(seguiu||0) + ' seguiram'}${ultimo || seguiu==null ? '' : croDeltaPP(seguiu, seguiuPrev)}</div>
     </div>`;
@@ -4161,11 +4162,6 @@ if(croHasData){
   [croStartInput, croEndInput].forEach(el=>el.addEventListener('change', ()=>{ croDesmarcaAtalho(); renderCroAll(); }));
   [document.getElementById('cro-dispositivo'), document.getElementById('cro-canal'), document.getElementById('cro-prod-filtro')].forEach(el=>el.addEventListener('change', renderCroAll));
   [document.getElementById('cro-cat-texto'), document.getElementById('cro-prod-texto')].forEach(el=>el.addEventListener('input', renderCroAll));
-  ['seg-cro-escala','seg-cro-escala-ck'].forEach(id=>seg(id, v=>{
-    croEscala = v;
-    ['seg-cro-escala','seg-cro-escala-ck'].forEach(o=>document.querySelectorAll('#'+o+' button').forEach(b=>b.setAttribute('aria-pressed', b.dataset.v===v ? 'true' : 'false')));
-    renderCroAll();
-  }));
   seg('seg-cro-atalho', v=>{
     const dias = +v, y = croYesterday();
     let s = dias===1 ? y : addDays(y, -(dias-1));
